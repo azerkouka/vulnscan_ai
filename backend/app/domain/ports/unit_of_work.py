@@ -8,6 +8,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from types import TracebackType
 
+from app.domain.ports.knowledge_document_repository import KnowledgeDocumentRepository
 from app.domain.ports.refresh_token_repository import RefreshTokenRepository
 from app.domain.ports.user_repository import UserRepository
 
@@ -15,6 +16,7 @@ from app.domain.ports.user_repository import UserRepository
 class UnitOfWork(ABC):
     users: UserRepository
     refresh_tokens: RefreshTokenRepository
+    knowledge_documents: KnowledgeDocumentRepository
 
     @abstractmethod
     async def __aenter__(self) -> UnitOfWork: ...

@@ -59,3 +59,22 @@ class RefreshTokenModel(Base):
     )
 
     user: Mapped[UserModel] = relationship(back_populates="refresh_tokens", foreign_keys=[user_id])
+
+
+class KnowledgeDocumentModel(Base):
+    """Postgres mirror of one ChromaDB knowledge-base entry - see
+    `app.domain.ports.knowledge_document_repository` for why this exists
+    alongside the vector store."""
+
+    __tablename__ = "knowledge_documents"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    external_id: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
+    source: Mapped[str] = mapped_column(String(16), index=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    category: Mapped[str | None] = mapped_column(String(255))
+    url: Mapped[str | None] = mapped_column(String(512))
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    ingested_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )

@@ -14,7 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
-from app.api.v1.routers import auth, health
+from app.api.v1.routers import auth, health, knowledge
 from app.core.config import get_settings
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import configure_logging, get_logger
@@ -70,8 +70,9 @@ def create_app() -> FastAPI:
 
     app.include_router(health.router, prefix=settings.api_v1_prefix)
     app.include_router(auth.router, prefix=settings.api_v1_prefix)
-    # Additional routers (scans, reports, dashboard, knowledge) are
-    # registered here as they land in later phases.
+    app.include_router(knowledge.router, prefix=settings.api_v1_prefix)
+    # Additional routers (scans, reports, dashboard) are registered here as
+    # they land in later phases.
 
     return app
 

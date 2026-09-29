@@ -6,8 +6,13 @@ is imported, so tests never depend on a developer's local `.env` file.
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import os
 from collections.abc import AsyncIterator
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING
+from uuid import uuid4
 
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-not-for-production-use-only")
 os.environ.setdefault("ENVIRONMENT", "test")
@@ -25,9 +30,15 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 from sqlalchemy.pool import NullPool
 
-from app.api.v1.dependencies import get_db_session
+from app.api.v1.dependencies import get_db_session, get_knowledge_store
+from app.domain.entities.user import User
 from app.infrastructure.persistence.models import Base
+from app.infrastructure.persistence.repositories.user_repository import SqlAlchemyUserRepository
+from app.infrastructure.security.password_hasher import Argon2PasswordHasher
 from app.main import create_app
+
+if TYPE_CHECKING:
+    from app.infrastructure.vectorstore.chroma_knowledge_store import ChromaKnowledgeStore
 
 
 @pytest.fixture
@@ -117,4 +128,89 @@ async def api_client(db_session: AsyncSession) -> AsyncIterator[AsyncClient]:
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        yield client
+
+
+@pytest_asyncio.fixture
+async def chroma_store() -> AsyncIterator[ChromaKnowledgeStore]:
+    """A `ChromaKnowledgeStore` against a real, throwaway collection.
+
+    Skips (like `db_engine`) if either `chromadb` isn't installed locally
+    (it's behind the optional `rag` extra - see `dependencies.py`) or no
+    Chroma server is reachable, so `pytest` stays runnable for contributors
+    without Docker or a Windows machine that can't compile the `rag` extra's
+    native dependencies.
+    """
+    try:
+        from app.infrastructure.vectorstore.chroma_knowledge_store import ChromaKnowledgeStore
+    except ImportError as exc:
+        pytest.skip(f"chromadb not installed (install the 'rag' extra to run this): {exc!r}")
+
+    host = os.environ.get("CHROMA_HOST", "localhost")
+    port = int(os.environ.get("CHROMA_PORT", "8000"))
+    collection_name = f"test_knowledge_{uuid4().hex[:8]}"
+
+    def _connect() -> ChromaKnowledgeStore:
+        store = ChromaKnowledgeStore(host=host, port=port, collection_name=collection_name)
+        store._client.heartbeat()  # cheap reachability check; raises if the server is down
+        return store
+
+    try:
+        store = await asyncio.to_thread(_connect)
+    except Exception as exc:  # broad on purpose: any connection failure just means "skip"
+        pytest.skip(
+            f"Chroma not reachable ({exc!r}); start it with `docker compose up -d chromadb`."
+        )
+
+    yield store
+
+    def _cleanup() -> None:
+        # Best-effort: the test may never have touched the collection at all
+        # (get_or_create_collection is only called lazily on first use).
+        with contextlib.suppress(Exception):
+            store._client.delete_collection(collection_name)
+
+    await asyncio.to_thread(_cleanup)
+
+
+@pytest_asyncio.fixture
+async def admin_api_client(
+    db_session: AsyncSession, chroma_store: ChromaKnowledgeStore
+) -> AsyncIterator[AsyncClient]:
+    """Like `api_client`, but also wired to the throwaway `chroma_store`
+    (so `/knowledge/*` endpoints hit an isolated collection, not whatever
+    the app's real singleton points at) and pre-authenticated as a
+    superuser - seeded directly via the repository, since registration
+    never sets `is_superuser`.
+    """
+    app = create_app()
+
+    async def _override_get_db_session() -> AsyncIterator[AsyncSession]:
+        yield db_session
+
+    app.dependency_overrides[get_db_session] = _override_get_db_session
+    app.dependency_overrides[get_knowledge_store] = lambda: chroma_store
+
+    hasher = Argon2PasswordHasher()
+    password = "admin-password-123"
+    now = datetime.now(UTC)
+    admin = User(
+        id=uuid4(),
+        email="admin@example.com",
+        hashed_password=hasher.hash(password),
+        full_name="Admin",
+        is_active=True,
+        is_superuser=True,
+        created_at=now,
+        updated_at=now,
+    )
+    await SqlAlchemyUserRepository(db_session).add(admin)
+    await db_session.flush()
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        login = await client.post(
+            "/api/v1/auth/login", json={"email": admin.email, "password": password}
+        )
+        client.headers["Authorization"] = f"Bearer {login.json()['access_token']}"
         yield client

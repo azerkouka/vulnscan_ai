@@ -116,14 +116,34 @@ npm run format:check
 npm test
 ```
 
+## Knowledge base
+
+Curated OWASP Top 10 / CWE / MITRE ATT&CK data lives in `backend/data/knowledge/`
+and is ingested into ChromaDB (+ a Postgres mirror table for admin listing
+and idempotency) via:
+
+```bash
+cd backend
+pip install -e ".[dev,rag]"
+python -m scripts.ingest_knowledge              # all sources
+python -m scripts.ingest_knowledge --source cwe # just one
+```
+
+Safe to re-run any time — documents are diffed by content hash, so
+unchanged entries are skipped rather than re-embedded. The same flow is
+available to admins (`is_superuser=true` users) via `POST
+/api/v1/knowledge/ingest`, alongside `GET /api/v1/knowledge/documents`,
+`GET /api/v1/knowledge/documents/{external_id}` and `GET
+/api/v1/knowledge/health`.
+
 ## Project status
 
 Built phase by phase; each phase is reviewed before the next starts.
 
 - [x] Phase 0 — Architecture proposal (folder tree, ERD, API list, `Finding` schema)
 - [x] Phase 1 — Project setup (docker-compose, config, logging, linting, pre-commit, CI)
-- [ ] Phase 2 — Backend auth (domain → use cases → infra → API) + tests
-- [ ] Phase 3 — Knowledge ingestion (OWASP, CWE, ATT&CK) into ChromaDB + retrieval tests
+- [x] Phase 2 — Backend auth (domain → use cases → infra → API) + tests
+- [x] Phase 3 — Knowledge ingestion (OWASP, CWE, ATT&CK) into ChromaDB + retrieval tests
 - [ ] Phase 4 — Code chunking + LLM analysis pipeline + scan use cases + async jobs + tests
 - [ ] Phase 5 — Angular core (auth, interceptors, guards, layout)
 - [ ] Phase 6 — Angular features (new scan, scan list, report view, dashboard)

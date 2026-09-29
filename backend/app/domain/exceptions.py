@@ -30,3 +30,7 @@ class InactiveUserError(DomainError):
 
 class UserNotFoundError(DomainError):
     """Raised when a referenced user id does not exist."""
+
+
+class KnowledgeDocumentNotFoundError(DomainError):
+    """Raised when a referenced knowledge document external_id does not exist."""

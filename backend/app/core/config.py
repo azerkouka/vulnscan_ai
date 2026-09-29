@@ -53,6 +53,10 @@ class Settings(BaseSettings):
     chroma_port: int = 8000
     chroma_collection_prefix: str = "vulnscan"
 
+    # --- Knowledge base ingestion ---
+    knowledge_data_dir: str = "data/knowledge"
+    knowledge_retrieval_top_k: int = 5
+
     # --- Ollama ---
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "llama3"

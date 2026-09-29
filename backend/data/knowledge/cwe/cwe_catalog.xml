@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Curated subset of the MITRE CWE List, in a simplified form of the
+  official Weakness_Catalog XML schema (https://cwe.mitre.org/data/).
+  Only the elements the ingestion loader needs are included. Entries chosen
+  for relevance to source-code-level vulnerability scanning.
+-->
+<Weakness_Catalog>
+  <Weaknesses>
+    <Weakness ID="20" Name="Improper Input Validation">
+      <Description>The product receives input or data, but it does not validate or incorrectly validates that the input has the properties that are required to process the data safely and correctly.</Description>
+      <Extended_Description>Input validation is a frequently-used technique for checking potentially dangerous inputs in order to ensure that the inputs are safe for processing within the code, or when communicating with other components. When software does not validate input properly, an attacker can craft the input in a form that is not expected by the rest of the application, leading to parts of the system receiving unintended input, which may result in altered control flow, arbitrary control of a resource, or arbitrary code execution.</Extended_Description>
+      <URL>https://cwe.mitre.org/data/definitions/20.html</URL>
+    </Weakness>
+    <Weakness ID="22" Name="Improper Limitation of a Pathname to a Restricted Directory ('Path Traversal')">
+      <Description>The product uses external input to construct a pathname that is intended to identify a file or directory that is located underneath a restricted parent directory, but the product does not properly neutralize special elements within the pathname that can cause the pathname to resolve to a location that is outside of the restricted directory.</Description>
+      <Extended_Description>Path traversal (also known as directory traversal) allows attackers to use "../" sequences or absolute paths to escape a restricted directory and access arbitrary files on the file system, including configuration files, credentials, or source code, and in some cases achieve code execution by overwriting files.</Extended_Description>
+      <URL>https://cwe.mitre.org/data/definitions/22.html</URL>
+    </Weakness>
+    <Weakness ID="78" Name="Improper Neutralization of Special Elements used in an OS Command ('OS Command Injection')">
+      <Description>The product constructs all or part of an OS command using externally-influenced input from an upstream component, but it does not neutralize or incorrectly neutralizes special elements that could modify the intended OS command when it is sent to a downstream component.</Description>
+      <Extended_Description>This weakness can lead to a wide range of consequences, most of which involve unauthorized or unintended behavior, potentially including execution of arbitrary commands, in the context of the vulnerable process. It is common in code that shells out to invoke an external program with user-controlled arguments concatenated into the command string.</Extended_Description>
+      <URL>https://cwe.mitre.org/data/definitions/78.html</URL>
+    </Weakness>
+    <Weakness ID="79" Name="Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')">
+      <Description>The product does not neutralize or incorrectly neutralizes user-controllable input before it is placed in output that is used as a web page that is served to other users.</Description>
+      <Extended_Description>Cross-site scripting (XSS) allows attackers to execute script in the victim's browser to hijack user sessions, deface web sites, insert hostile content, redirect users, hijack the user's browser using malware, and more. It typically results from web applications reflecting or storing untrusted input without proper output encoding.</Extended_Description>
+      <URL>https://cwe.mitre.org/data/definitions/79.html</URL>
+    </Weakness>
+    <Weakness ID="89" Name="Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection')">
+      <Description>The product constructs all or part of an SQL command using externally-influenced input from an upstream component, but it does not neutralize or incorrectly neutralizes special elements that could modify the intended SQL command when it is sent to a downstream component.</Description>
+      <Extended_Description>SQL injection occurs when untrusted data is concatenated directly into a SQL query string instead of being passed as a bound parameter. A successful attack can read, modify, or delete arbitrary data, bypass authentication, or in some database configurations execute operating-system commands.</Extended_Description>
+      <URL>https://cwe.mitre.org/data/definitions/89.html</URL>
+    </Weakness>
+    <Weakness ID="94" Name="Improper Control of Generation of Code ('Code Injection')">
+      <Description>The product constructs all or part of a code segment using externally-influenced input from an upstream component, but it does not neutralize or incorrectly neutralizes special elements that could modify the syntax or behavior of the intended code segment.</Description>
+      <Extended_Description>Code injection typically occurs when an application passes untrusted input to a function such as `eval()`, `exec()`, or a templating engine's render function that dynamically interprets it as code, allowing an attacker to run arbitrary code in the context of the application.</Extended_Description>
+      <URL>https://cwe.mitre.org/data/definitions/94.html</URL>
+    </Weakness>
+    <Weakness ID="190" Name="Integer Overflow or Wraparound">
+      <Description>The product performs a calculation that can produce an integer overflow or wraparound, when the logic assumes that the resulting value will always be larger than the original value.</Description>
+      <Extended_Description>An integer overflow occurs when an arithmetic operation attempts to create a numeric value that is too large to be represented within the available storage space, wrapping around to a small or negative value. This can lead to incorrect resource allocation sizes, buffer overflows, or logic errors such as bypassed length checks.</Extended_Description>
+      <URL>https://cwe.mitre.org/data/definitions/190.html</URL>
+    </Weakness>
+    <Weakness ID="209" Name="Generation of Error Message Containing Sensitive Information">
+      <Description>The product generates an error message that includes sensitive information about its environment, users, or associated data, which could be exploited by an attacker.</Description>
+      <Extended_Description>Overly detailed error messages, such as full stack traces, internal file paths, database query text, or framework version numbers, can help an attacker map the application's internals and craft further, more targeted attacks.</Extended_Description>
+      <URL>https://cwe.mitre.org/data/definitions/209.html</URL>
+    </Weakness>
+    <Weakness ID="259" Name="Use of Hard-coded Password">
+      <Description>The product contains a hard-coded password, which it uses for its own inbound authentication or for outbound communication to external components.</Description>
+      <Extended_Description>Hard-coded passwords in source code are easily discovered by anyone with read access to the code or a decompiled binary, and cannot be changed without a new release, making compromise trivial and remediation slow.</Extended_Description>
+      <URL>https://cwe.mitre.org/data/definitions/259.html</URL>
+    </Weakness>
+    <Weakness ID="284" Name="Improper Access Control">
+      <Description>The product does not restrict or incorrectly restricts access to a resource from an unauthorized actor.</Description>
+      <Extended_Description>Access control involves the use of several protection mechanisms, such as authentication, authorization, and accountability. When any of these mechanisms are missing, misconfigured, or bypassable, an attacker may access functionality or data that should be restricted to other users or roles.</Extended_Description>
+      <URL>https://cwe.mitre.org/data/definitions/284.html</URL>
+    </Weakness>
+    <Weakness ID="287" Name="Improper Authentication">
+      <Description>When an actor claims to have a given identity, the product does not prove or insufficiently proves that the claim is correct.</Description>
+      <Extended_Description>This includes flaws such as accepting any password, trusting client-supplied identity claims without server-side verification, or authentication logic that can be bypassed via alternate code paths (e.g. missing checks on a secondary API endpoint).</Extended_Description>
+      <URL>https://cwe.mitre.org/data/definitions/287.html</URL>
+    </Weakness>
+    <Weakness ID="311" Name="Missing Encryption of Sensitive Data">
+      <Description>The product does not encrypt sensitive or critical information before storage or transmission.</Description>
+      <Extended_Description>The lack of proper data encryption passes up the guarantees of confidentiality, integrity, and accountability that properly implemented encryption conveys, exposing data such as credentials, PII, or session tokens to interception or unauthorized access.</Extended_Description>
+      <URL>https://cwe.mitre.org/data/definitions/311.html</URL>
+    </Weakness>
+    <Weakness ID="327" Name="Use of a Broken or Risky Cryptographic Algorithm">
+      <Description>The product uses a broken or risky cryptographic algorithm or protocol.</Description>
+      <Extended_Description>The use of a non-standard, deprecated, or otherwise broken cryptographic algorithm (e.g. MD5 or SHA-1 for integrity, DES or RC4 for confidentiality) is dangerous because a determined attacker may be able to break the algorithm and compromise whatever data has been protected. Using a proven, standard algorithm is more secure and easier to configure correctly.</Extended_Description>
+      <URL>https://cwe.mitre.org/data/definitions/327.html</URL>
+    </Weakness>
+    <Weakness ID="352" Name="Cross-Site Request Forgery (CSRF)">
+      <Description>The web application does not, or cannot, sufficiently verify whether a well-formed, valid, consistent request was intentionally provided by the user who submitted the request.</Description>
+      <Extended_Description>CSRF allows an attacker to trick a victim's browser into sending a forged, authenticated request (e.g. via an auto-submitting form or image tag on an attacker-controlled page) that performs a state-changing action on the vulnerable site without the victim's consent, exploiting the fact that browsers automatically attach session cookies.</Extended_Description>
+      <URL>https://cwe.mitre.org/data/definitions/352.html</URL>
+    </Weakness>
+    <Weakness ID="362" Name="Concurrent Execution using Shared Resource with Improper Synchronization ('Race Condition')">
+      <Description>The program contains a code sequence that can run concurrently with other code, and the code sequence requires temporary, exclusive access to a shared resource, but a timing window exists in which the shared resource can be modified by another code sequence operating concurrently.</Description>
+      <Extended_Description>Race conditions between a check and a subsequent use of a resource (time-of-check to time-of-use, TOCTOU) are a common source of security vulnerabilities, for example checking a file's permissions and then opening it in two separate steps, allowing an attacker to swap the file in between.</Extended_Description>
+      <URL>https://cwe.mitre.org/data/definitions/362.html</URL>
+    </Weakness>
+    <Weakness ID="502" Name="Deserialization of Untrusted Data">
+      <Description>The product deserializes untrusted data without sufficiently verifying that the resulting data will be valid.</Description>
+      <Extended_Description>Deserializing data from an untrusted source (e.g. Python `pickle`, Java native serialization, PHP `unserialize`, YAML's unsafe loader) can allow an attacker to instantiate arbitrary objects and, depending on the classes available on the classpath, achieve remote code execution, denial of service, or other unexpected behavior.</Extended_Description>
+      <URL>https://cwe.mitre.org/data/definitions/502.html</URL>
+    </Weakness>
+    <Weakness ID="611" Name="Improper Restriction of XML External Entity Reference">
+      <Description>The product processes an XML document that can contain XML entities with URIs that resolve to documents outside of the intended sphere of control, causing the product to embed incorrect documents into its output.</Description>
+      <Extended_Description>XML External Entity (XXE) injection occurs when an XML parser is configured to resolve external entities, allowing an attacker-supplied DOCTYPE declaration to read local files, perform server-side request forgery, or cause denial of service via entity expansion ("billion laughs").</Extended_Description>
+      <URL>https://cwe.mitre.org/data/definitions/611.html</URL>
+    </Weakness>
+    <Weakness ID="798" Name="Use of Hard-coded Credentials">
+      <Description>The product contains hard-coded credentials, such as a password or cryptographic key, which it uses for its own inbound authentication, outbound communication to external components, or encryption of internal data.</Description>
+      <Extended_Description>Hard-coded credentials embedded in source code, configuration files, or binaries are effectively public once the artifact is distributed or the repository is exposed, and they cannot be rotated without a code change, making incident response very difficult.</Extended_Description>
+      <URL>https://cwe.mitre.org/data/definitions/798.html</URL>
+    </Weakness>
+    <Weakness ID="918" Name="Server-Side Request Forgery (SSRF)">
+      <Description>The web server receives a URL or similar request from an upstream component and retrieves the contents of this URL, but it does not sufficiently ensure that the request is being sent to the expected destination.</Description>
+      <Extended_Description>By providing URLs to unexpected hosts or ports, attackers can make it appear that the server is sending the request, possibly bypassing access controls such as firewalls that prevent the attackers from accessing the URLs directly, and reach internal-only services such as cloud metadata endpoints.</Extended_Description>
+      <URL>https://cwe.mitre.org/data/definitions/918.html</URL>
+    </Weakness>
+  </Weaknesses>
+</Weakness_Catalog>

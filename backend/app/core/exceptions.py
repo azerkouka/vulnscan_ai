@@ -21,6 +21,7 @@ from app.domain.exceptions import (
     InactiveUserError,
     InvalidCredentialsError,
     InvalidRefreshTokenError,
+    KnowledgeDocumentNotFoundError,
     UserNotFoundError,
 )
 
@@ -32,6 +33,7 @@ _DOMAIN_ERROR_STATUS: dict[type[DomainError], int] = {
     InvalidRefreshTokenError: status.HTTP_401_UNAUTHORIZED,
     InactiveUserError: status.HTTP_403_FORBIDDEN,
     UserNotFoundError: status.HTTP_404_NOT_FOUND,
+    KnowledgeDocumentNotFoundError: status.HTTP_404_NOT_FOUND,
 }
 
 

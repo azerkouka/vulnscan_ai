@@ -1,3 +1,6 @@
+from app.domain.ports.knowledge_document_repository import KnowledgeDocumentRepository
+from app.domain.ports.knowledge_indexer import KnowledgeIndexer
+from app.domain.ports.knowledge_retriever import KnowledgeRetriever, RetrievedKnowledge
 from app.domain.ports.password_hasher import PasswordHasher
 from app.domain.ports.refresh_token_repository import RefreshTokenRepository
 from app.domain.ports.token_service import AccessTokenClaims, TokenService
@@ -6,8 +9,12 @@ from app.domain.ports.user_repository import UserRepository
 
 __all__ = [
     "AccessTokenClaims",
+    "KnowledgeDocumentRepository",
+    "KnowledgeIndexer",
+    "KnowledgeRetriever",
     "PasswordHasher",
     "RefreshTokenRepository",
+    "RetrievedKnowledge",
     "TokenService",
     "UnitOfWork",
     "UserRepository",

@@ -27,9 +27,9 @@ jobs:
           cache-dependency-path: backend/pyproject.toml
       - name: Install backend + dev dependencies
         working-directory: backend
-        # Extend to ".[dev,rag]" from Phase 3 and ".[dev,rag,chunking,export]"
-        # from Phase 4/7 onward, as those optional groups start being used.
-        run: pip install -e ".[dev]"
+        # Extend to ".[dev,rag,chunking,export]" from Phase 4/7 onward, as
+        # those optional groups start being used.
+        run: pip install -e ".[dev,rag]"
       - name: ruff
         working-directory: backend
         run: ruff check .
@@ -56,10 +56,15 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+      chromadb:
+        image: chromadb/chroma:0.5.20
+        ports: ["8000:8000"]
     env:
       JWT_SECRET_KEY: ci-test-secret-key
       ENVIRONMENT: test
       DATABASE_URL: postgresql+asyncpg://vulnscan:vulnscan@localhost:5432/vulnscan_test
+      CHROMA_HOST: localhost
+      CHROMA_PORT: 8000
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -69,7 +74,20 @@ jobs:
           cache-dependency-path: backend/pyproject.toml
       - name: Install backend + dev dependencies
         working-directory: backend
-        run: pip install -e ".[dev]"
+        run: pip install -e ".[dev,rag]"
+      - name: Wait for ChromaDB
+        # No --health-cmd on the service above: it'd run via `docker exec`
+        # inside the chromadb image, which may not have curl. Polling from
+        # the runner against the published port needs no such assumption.
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8000/api/v1/heartbeat > /dev/null; then
+              echo "ChromaDB is up"; exit 0
+            fi
+            sleep 2
+          done
+          echo "ChromaDB did not become ready in time" >&2
+          exit 1
       - name: pytest
         working-directory: backend
         # Coverage enforcement (>=80% on domain/application) is switched on

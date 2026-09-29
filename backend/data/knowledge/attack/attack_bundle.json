@@ -1,0 +1,115 @@
+{
+  "type": "bundle",
+  "id": "bundle--curated-subset-for-vulnscan-ai",
+  "spec_version": "2.1",
+  "objects": [
+    {
+      "type": "attack-pattern",
+      "name": "Exploit Public-Facing Application",
+      "description": "Adversaries may attempt to exploit a weakness in an Internet-facing host or system to initially access a network. Vulnerabilities such as SQL injection, remote code execution, or path traversal in a web application are common entry points.",
+      "external_references": [
+        {"source_name": "mitre-attack", "external_id": "T1190", "url": "https://attack.mitre.org/techniques/T1190/"}
+      ],
+      "kill_chain_phases": [{"kill_chain_name": "mitre-attack", "phase_name": "initial-access"}]
+    },
+    {
+      "type": "attack-pattern",
+      "name": "Command and Scripting Interpreter",
+      "description": "Adversaries may abuse command and script interpreters (e.g. a shell, PowerShell, Python) to execute commands, scripts, or binaries, often after achieving code execution via an injection vulnerability in an application.",
+      "external_references": [
+        {"source_name": "mitre-attack", "external_id": "T1059", "url": "https://attack.mitre.org/techniques/T1059/"}
+      ],
+      "kill_chain_phases": [{"kill_chain_name": "mitre-attack", "phase_name": "execution"}]
+    },
+    {
+      "type": "attack-pattern",
+      "name": "Unsecured Credentials",
+      "description": "Adversaries may search compromised systems, source code, configuration files, or environment variables to find credentials such as hard-coded passwords, API keys, or private keys stored in plaintext.",
+      "external_references": [
+        {"source_name": "mitre-attack", "external_id": "T1552", "url": "https://attack.mitre.org/techniques/T1552/"}
+      ],
+      "kill_chain_phases": [{"kill_chain_name": "mitre-attack", "phase_name": "credential-access"}]
+    },
+    {
+      "type": "attack-pattern",
+      "name": "Valid Accounts",
+      "description": "Adversaries may obtain and abuse credentials of existing accounts, including those exposed via weak authentication, credential stuffing, or reused/default passwords, as a means of gaining access while evading detection.",
+      "external_references": [
+        {"source_name": "mitre-attack", "external_id": "T1078", "url": "https://attack.mitre.org/techniques/T1078/"}
+      ],
+      "kill_chain_phases": [{"kill_chain_name": "mitre-attack", "phase_name": "defense-evasion"}]
+    },
+    {
+      "type": "attack-pattern",
+      "name": "Application Layer Protocol",
+      "description": "Adversaries may communicate using OSI application layer protocols (HTTP, HTTPS, DNS) to blend command-and-control traffic with existing traffic, often exploiting an SSRF vulnerability to reach internal-only endpoints.",
+      "external_references": [
+        {"source_name": "mitre-attack", "external_id": "T1071", "url": "https://attack.mitre.org/techniques/T1071/"}
+      ],
+      "kill_chain_phases": [{"kill_chain_name": "mitre-attack", "phase_name": "command-and-control"}]
+    },
+    {
+      "type": "attack-pattern",
+      "name": "Process Injection",
+      "description": "Adversaries may inject code into processes in order to evade process-based defenses and elevate privileges, sometimes achieved via a deserialization vulnerability that allows arbitrary code execution in the target process.",
+      "external_references": [
+        {"source_name": "mitre-attack", "external_id": "T1055", "url": "https://attack.mitre.org/techniques/T1055/"}
+      ],
+      "kill_chain_phases": [{"kill_chain_name": "mitre-attack", "phase_name": "defense-evasion"}]
+    },
+    {
+      "type": "attack-pattern",
+      "name": "Data Encrypted for Impact",
+      "description": "Adversaries may encrypt data on target systems to interrupt availability, often after gaining code execution through an application vulnerability, as part of a ransomware operation.",
+      "external_references": [
+        {"source_name": "mitre-attack", "external_id": "T1486", "url": "https://attack.mitre.org/techniques/T1486/"}
+      ],
+      "kill_chain_phases": [{"kill_chain_name": "mitre-attack", "phase_name": "impact"}]
+    },
+    {
+      "type": "attack-pattern",
+      "name": "Supply Chain Compromise",
+      "description": "Adversaries may manipulate products or product delivery mechanisms, such as third-party software dependencies, before receipt by a final consumer, to achieve data or system compromise - relevant when an application uses vulnerable or outdated components.",
+      "external_references": [
+        {"source_name": "mitre-attack", "external_id": "T1195", "url": "https://attack.mitre.org/techniques/T1195/"}
+      ],
+      "kill_chain_phases": [{"kill_chain_name": "mitre-attack", "phase_name": "initial-access"}]
+    },
+    {
+      "type": "attack-pattern",
+      "name": "Exploitation of Remote Services",
+      "description": "Adversaries may exploit remote services (e.g. a database, RPC endpoint, or internal API reachable via SSRF) to gain unauthorized access, often by taking advantage of a programming error such as a buffer overflow or injection flaw.",
+      "external_references": [
+        {"source_name": "mitre-attack", "external_id": "T1210", "url": "https://attack.mitre.org/techniques/T1210/"}
+      ],
+      "kill_chain_phases": [{"kill_chain_name": "mitre-attack", "phase_name": "lateral-movement"}]
+    },
+    {
+      "type": "attack-pattern",
+      "name": "Abuse Elevation Control Mechanism",
+      "description": "Adversaries may circumvent mechanisms designed to control elevated privileges, exploiting broken access control or improper authorization checks in an application to gain higher-privileged access than intended.",
+      "external_references": [
+        {"source_name": "mitre-attack", "external_id": "T1548", "url": "https://attack.mitre.org/techniques/T1548/"}
+      ],
+      "kill_chain_phases": [{"kill_chain_name": "mitre-attack", "phase_name": "privilege-escalation"}]
+    },
+    {
+      "type": "attack-pattern",
+      "name": "Escape to Host",
+      "description": "Adversaries may break out of a container to gain access to the underlying host, sometimes made possible by a path traversal or deserialization vulnerability in a containerized application combined with an overly permissive container configuration.",
+      "external_references": [
+        {"source_name": "mitre-attack", "external_id": "T1611", "url": "https://attack.mitre.org/techniques/T1611/"}
+      ],
+      "kill_chain_phases": [{"kill_chain_name": "mitre-attack", "phase_name": "privilege-escalation"}]
+    },
+    {
+      "type": "attack-pattern",
+      "name": "Endpoint Denial of Service",
+      "description": "Adversaries may perform attacks that degrade or block the availability of a targeted resource, for example by exploiting an unbounded resource-consumption flaw (e.g. XML entity expansion, unvalidated file uploads) in an application endpoint.",
+      "external_references": [
+        {"source_name": "mitre-attack", "external_id": "T1499", "url": "https://attack.mitre.org/techniques/T1499/"}
+      ],
+      "kill_chain_phases": [{"kill_chain_name": "mitre-attack", "phase_name": "impact"}]
+    }
+  ]
+}
