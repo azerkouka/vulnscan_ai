@@ -1,0 +1,51 @@
+# --- Environment / secrets ---
+.env
+.env.*
+!.env.example
+
+# --- Python (backend) ---
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+backend/app/**/*.db
+backend/chroma_data/
+backend/uploads/
+backend/*.sqlite3
+
+# --- Node / Angular (frontend) ---
+frontend/node_modules/
+frontend/dist/
+frontend/.angular/
+frontend/coverage/
+frontend/*.log
+npm-debug.log*
+
+# --- Docker / infra volumes ---
+postgres_data/
+chroma_data/
+ollama_data/
+
+# --- IDE / OS ---
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# --- Logs ---
+*.log
+logs/

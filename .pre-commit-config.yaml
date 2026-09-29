@@ -1,0 +1,69 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-toml
+      - id: check-added-large-files
+        args: ["--maxkb=1024"]
+      - id: check-merge-conflict
+      - id: mixed-line-ending
+        args: ["--fix=lf"]
+      - id: detect-private-key
+
+  # --- Backend (Python) ---
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.7.4
+    hooks:
+      - id: ruff
+        name: ruff (backend lint)
+        args: ["--fix"]
+        files: ^backend/
+
+  - repo: https://github.com/psf/black
+    rev: 24.10.0
+    hooks:
+      - id: black
+        name: black (backend format)
+        files: ^backend/
+        args: ["--config", "backend/pyproject.toml"]
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.13.0
+    hooks:
+      - id: mypy
+        name: mypy (backend strict)
+        files: ^backend/app/
+        args: ["--config-file=backend/pyproject.toml"]
+        additional_dependencies:
+          - pydantic>=2.9
+          - pydantic-settings>=2.6
+          - types-python-jose
+
+  # --- Frontend (Angular / TypeScript) ---
+  - repo: local
+    hooks:
+      - id: eslint
+        name: eslint (frontend lint)
+        entry: bash -c 'cd frontend && npm run lint --silent'
+        language: system
+        files: ^frontend/.*\.(ts|html)$
+        pass_filenames: false
+
+      - id: prettier
+        name: prettier (frontend format check)
+        entry: bash -c 'cd frontend && npm run format:check --silent'
+        language: system
+        files: ^frontend/.*\.(ts|html|scss|json)$
+        pass_filenames: false
+
+  # --- Conventional commit messages ---
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v3.4.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+        args: []
