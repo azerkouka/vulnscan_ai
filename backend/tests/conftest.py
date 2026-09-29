@@ -21,6 +21,7 @@ os.environ.setdefault("AUTH_RATE_LIMIT", "1000/minute")
 import pytest
 import pytest_asyncio
 from fastapi.testclient import TestClient
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 from sqlalchemy.pool import NullPool
 
@@ -92,11 +93,20 @@ async def db_session(db_engine: AsyncEngine) -> AsyncIterator[AsyncSession]:
     await connection.close()
 
 
-@pytest.fixture
-def api_client(db_session: AsyncSession) -> TestClient:
-    """An API test client whose `get_db_session` dependency is pinned to the
-    per-test transactional session above, so e2e tests see real repository
-    and SQL behavior while staying isolated between tests.
+@pytest_asyncio.fixture
+async def api_client(db_session: AsyncSession) -> AsyncIterator[AsyncClient]:
+    """An async API test client whose `get_db_session` dependency is pinned
+    to the per-test transactional session above, so e2e tests see real
+    repository and SQL behavior while staying isolated between tests.
+
+    Deliberately `httpx.AsyncClient` + `ASGITransport`, not
+    `starlette.testclient.TestClient`: `TestClient` runs the ASGI app inside
+    its own dedicated thread and event loop (an anyio `BlockingPortal`),
+    separate from the loop pytest-asyncio runs this fixture (and `db_session`)
+    on. Sharing one live `AsyncSession`/asyncpg connection across that loop
+    boundary raises "Future ... attached to a different loop" as soon as a
+    request tries to use it. Driving the app in-process on the *same* loop
+    (what `ASGITransport` does) avoids the problem entirely.
     """
     app = create_app()
 
@@ -105,5 +115,6 @@ def api_client(db_session: AsyncSession) -> TestClient:
 
     app.dependency_overrides[get_db_session] = _override_get_db_session
 
-    with TestClient(app) as test_client:
-        yield test_client
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        yield client

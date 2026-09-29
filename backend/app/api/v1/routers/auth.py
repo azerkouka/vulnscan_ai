@@ -1,5 +1,11 @@
-from __future__ import annotations
-
+# Intentionally no `from __future__ import annotations` in this file: slowapi's
+# `@limiter.limit(...)` decorator wraps the endpoint in a function defined in
+# slowapi's own module. With postponed evaluation, FastAPI has to resolve
+# parameter annotations (stored as strings) via the function's `__globals__`,
+# which - after wrapping - point at slowapi's namespace instead of this
+# module's, so it can't find `RegisterRequest`/`LoginRequest` and silently
+# misclassifies the body parameter as a query parameter (422 "Field
+# required"). Keeping real annotation objects here sidesteps that entirely.
 from fastapi import APIRouter, Depends, Request, status
 
 from app.api.v1.dependencies import (

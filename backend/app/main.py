@@ -7,21 +7,18 @@ in this module or in the routers themselves.
 
 from __future__ import annotations
 
-import time
-import uuid
-from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from slowapi.middleware import SlowAPIMiddleware
 
 from app.api.v1.routers import auth, health
 from app.core.config import get_settings
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import configure_logging, get_logger
+from app.core.middleware import RequestContextMiddleware
 from app.core.rate_limit import limiter
 from app.infrastructure.persistence.database import create_engine, create_session_factory
 
@@ -55,8 +52,12 @@ def create_app() -> FastAPI:
 
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
-    app.add_middleware(SlowAPIMiddleware)
 
+    # Pure-ASGI middleware only (see app.core.middleware docstring): mixing in
+    # a `BaseHTTPMiddleware`-based one (slowapi's `SlowAPIMiddleware`, or the
+    # `@app.middleware("http")` decorator) breaks async SQLAlchemy sessions
+    # shared across a request boundary via dependency overrides in tests.
+    app.add_middleware(RequestContextMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
@@ -64,25 +65,6 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-
-    @app.middleware("http")
-    async def request_context(
-        request: Request, call_next: Callable[[Request], Awaitable[Response]]
-    ) -> Response:
-        request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
-        start = time.perf_counter()
-        response = await call_next(request)
-        duration_ms = round((time.perf_counter() - start) * 1000, 2)
-        response.headers["X-Request-ID"] = request_id
-        logger.info(
-            "request_completed",
-            request_id=request_id,
-            method=request.method,
-            path=request.url.path,
-            status_code=response.status_code,
-            duration_ms=duration_ms,
-        )
-        return response
 
     register_exception_handlers(app)
 
