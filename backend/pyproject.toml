@@ -108,6 +108,12 @@ ignore = [
 [tool.ruff.lint.isort]
 known-first-party = ["app"]
 
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI's DI idiom is `param: T = Depends(...)` - these calls are
+# side-effect-free markers evaluated once per request by FastAPI itself, not
+# the mutable-default-argument footgun B008 warns about.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Path", "fastapi.Body"]
+
 # ---------------------------------------------------------------------------
 # Black
 # ---------------------------------------------------------------------------

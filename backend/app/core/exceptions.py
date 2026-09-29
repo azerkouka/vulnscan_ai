@@ -15,8 +15,24 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.core.logging import get_logger
+from app.domain.exceptions import (
+    DomainError,
+    EmailAlreadyRegisteredError,
+    InactiveUserError,
+    InvalidCredentialsError,
+    InvalidRefreshTokenError,
+    UserNotFoundError,
+)
 
 logger = get_logger(__name__)
+
+_DOMAIN_ERROR_STATUS: dict[type[DomainError], int] = {
+    EmailAlreadyRegisteredError: status.HTTP_409_CONFLICT,
+    InvalidCredentialsError: status.HTTP_401_UNAUTHORIZED,
+    InvalidRefreshTokenError: status.HTTP_401_UNAUTHORIZED,
+    InactiveUserError: status.HTTP_403_FORBIDDEN,
+    UserNotFoundError: status.HTTP_404_NOT_FOUND,
+}
 
 
 class AppError(Exception):
@@ -73,6 +89,13 @@ def register_exception_handlers(app: FastAPI) -> None:
     async def handle_app_error(_request: Request, exc: AppError) -> JSONResponse:
         logger.info("app_error", error_code=exc.error_code, message=exc.message)
         return _error_response(exc.status_code, exc.error_code, exc.message)
+
+    @app.exception_handler(DomainError)
+    async def handle_domain_error(_request: Request, exc: DomainError) -> JSONResponse:
+        status_code = _DOMAIN_ERROR_STATUS.get(type(exc), status.HTTP_400_BAD_REQUEST)
+        error_code = type(exc).__name__.removesuffix("Error")
+        logger.info("domain_error", error_code=error_code, message=str(exc))
+        return _error_response(status_code, error_code, str(exc))
 
     @app.exception_handler(StarletteHTTPException)
     async def handle_http_exception(_request: Request, exc: StarletteHTTPException) -> JSONResponse:
