@@ -19,9 +19,14 @@ from app.domain.exceptions import (
     DomainError,
     EmailAlreadyRegisteredError,
     InactiveUserError,
+    InvalidArchiveError,
     InvalidCredentialsError,
     InvalidRefreshTokenError,
+    InvalidSourceError,
     KnowledgeDocumentNotFoundError,
+    ScanInProgressError,
+    ScanNotFoundError,
+    SourceTooLargeError,
     UserNotFoundError,
 )
 
@@ -34,6 +39,11 @@ _DOMAIN_ERROR_STATUS: dict[type[DomainError], int] = {
     InactiveUserError: status.HTTP_403_FORBIDDEN,
     UserNotFoundError: status.HTTP_404_NOT_FOUND,
     KnowledgeDocumentNotFoundError: status.HTTP_404_NOT_FOUND,
+    ScanNotFoundError: status.HTTP_404_NOT_FOUND,
+    ScanInProgressError: status.HTTP_409_CONFLICT,
+    InvalidSourceError: status.HTTP_422_UNPROCESSABLE_ENTITY,
+    InvalidArchiveError: status.HTTP_422_UNPROCESSABLE_ENTITY,
+    SourceTooLargeError: status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
 }
 
 

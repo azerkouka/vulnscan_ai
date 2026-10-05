@@ -29,7 +29,9 @@ class ChromaKnowledgeStore(KnowledgeIndexer, KnowledgeRetriever):
     def __init__(self, host: str, port: int, collection_name: str) -> None:
         self._client = chromadb.HttpClient(host=host, port=port)
         self._collection_name = collection_name
-        self._embedding_function = DefaultEmbeddingFunction()
+        # Any: chromadb's own annotations for embedding functions don't line
+        # up between this factory and `get_or_create_collection`.
+        self._embedding_function: Any = DefaultEmbeddingFunction()
 
     def _collection(self) -> chromadb.Collection:
         return self._client.get_or_create_collection(
@@ -67,8 +69,7 @@ class ChromaKnowledgeStore(KnowledgeIndexer, KnowledgeRetriever):
         def _do_count() -> int:
             collection = self._collection()
             if source is None:
-                # chromadb is untyped, so `.count()` is inferred as Any.
-                return collection.count()  # type: ignore[no-any-return]
+                return int(collection.count())
             result = collection.get(where={"source": source.value}, include=[])
             return len(result["ids"])
 
@@ -77,10 +78,9 @@ class ChromaKnowledgeStore(KnowledgeIndexer, KnowledgeRetriever):
     async def query(
         self, query_text: str, *, top_k: int = 5, source: KnowledgeSource | None = None
     ) -> list[RetrievedKnowledge]:
-        def _do_query() -> dict[str, Any]:
+        def _do_query() -> Any:
             collection = self._collection()
-            # chromadb is untyped, so `.query()` is inferred as Any.
-            return collection.query(  # type: ignore[no-any-return]
+            return collection.query(
                 query_texts=[query_text],
                 n_results=top_k,
                 where={"source": source.value} if source else None,

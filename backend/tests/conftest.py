@@ -9,10 +9,12 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import os
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
+from dataclasses import dataclass
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import TYPE_CHECKING
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-not-for-production-use-only")
 os.environ.setdefault("ENVIRONMENT", "test")
@@ -30,12 +32,28 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 from sqlalchemy.pool import NullPool
 
-from app.api.v1.dependencies import get_db_session, get_knowledge_store
+from app.api.v1.dependencies import (
+    get_db_session,
+    get_job_runner,
+    get_knowledge_store,
+    get_source_storage,
+)
+from app.application.use_cases.run_scan_analysis import RunScanAnalysisUseCase
+from app.core.config import get_settings
 from app.domain.entities.user import User
+from app.domain.ports.job_runner import JobRunner
 from app.infrastructure.persistence.models import Base
 from app.infrastructure.persistence.repositories.user_repository import SqlAlchemyUserRepository
+from app.infrastructure.persistence.unit_of_work import SqlAlchemyUnitOfWork
 from app.infrastructure.security.password_hasher import Argon2PasswordHasher
+from app.infrastructure.uploads.local_source_storage import LocalSourceStorage
 from app.main import create_app
+from tests.unit.fakes import (
+    FakeCodeChunker,
+    FakeKnowledgeIndexer,
+    FakeKnowledgeRetriever,
+    FakeLLMAnalyzer,
+)
 
 if TYPE_CHECKING:
     from app.infrastructure.vectorstore.chroma_knowledge_store import ChromaKnowledgeStore
@@ -214,3 +232,93 @@ async def admin_api_client(
         )
         client.headers["Authorization"] = f"Bearer {login.json()['access_token']}"
         yield client
+
+
+class InlineJobRunner(JobRunner):
+    """Runs scan jobs in the test's own task and session instead of in the
+    background, so a test can assert on a finished scan right after
+    submitting it. Set `paused` to observe a scan while it is still PENDING,
+    then `run_pending()` to let it through."""
+
+    def __init__(self, run_scan: Callable[[UUID], Awaitable[None]]) -> None:
+        self._run_scan = run_scan
+        self._pending: list[UUID] = []
+        self.paused = False
+
+    async def enqueue_scan(self, scan_id: UUID) -> None:
+        self._pending.append(scan_id)
+        if not self.paused:
+            await self.run_pending()
+
+    async def run_pending(self) -> None:
+        while self._pending:
+            await self._run_scan(self._pending.pop(0))
+
+
+@dataclass
+class ScanApiHarness:
+    client: AsyncClient
+    """Authenticated as a regular (non-admin) user."""
+    analyzer: FakeLLMAnalyzer
+    indexer: FakeKnowledgeIndexer
+    """What the fake retriever searches - index a document to make it citable."""
+    jobs: InlineJobRunner
+    storage_dir: Path
+    max_upload_bytes: int
+
+    def stored_files(self) -> list[Path]:
+        return [path for path in self.storage_dir.rglob("*") if path.is_file()]
+
+    async def login_as(self, email: str) -> None:
+        """Registers `email` and switches the client over to that user."""
+        credentials = {"email": email, "password": "correct-horse-battery"}
+        await self.client.post("/api/v1/auth/register", json=credentials)
+        login = await self.client.post("/api/v1/auth/login", json=credentials)
+        self.client.headers["Authorization"] = f"Bearer {login.json()['access_token']}"
+
+
+@pytest_asyncio.fixture
+async def scan_api(db_session: AsyncSession, tmp_path: Path) -> AsyncIterator[ScanApiHarness]:
+    """The API wired for `/scans` tests: real database, real file storage
+    (under `tmp_path`) and real zip extraction, but a scripted LLM, an
+    in-memory knowledge base, and jobs run inline (`InlineJobRunner`) - the
+    LLM is always mocked in tests, per the project rules."""
+    app = create_app()
+    storage = LocalSourceStorage(tmp_path)
+    analyzer = FakeLLMAnalyzer()
+    indexer = FakeKnowledgeIndexer()
+
+    async def _run_scan(scan_id: UUID) -> None:
+        use_case = RunScanAnalysisUseCase(
+            SqlAlchemyUnitOfWork(db_session),
+            storage,
+            FakeCodeChunker(),
+            FakeKnowledgeRetriever(indexer),
+            analyzer,
+        )
+        await use_case.execute(scan_id)
+
+    jobs = InlineJobRunner(_run_scan)
+    # A 1 MB cap keeps the "upload too large" test from pushing 10 MB around.
+    settings = get_settings().model_copy(update={"upload_max_size_mb": 1})
+
+    async def _override_get_db_session() -> AsyncIterator[AsyncSession]:
+        yield db_session
+
+    app.dependency_overrides[get_db_session] = _override_get_db_session
+    app.dependency_overrides[get_settings] = lambda: settings
+    app.dependency_overrides[get_source_storage] = lambda: storage
+    app.dependency_overrides[get_job_runner] = lambda: jobs
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        harness = ScanApiHarness(
+            client=client,
+            analyzer=analyzer,
+            indexer=indexer,
+            jobs=jobs,
+            storage_dir=tmp_path,
+            max_upload_bytes=settings.upload_max_size_mb * 1024 * 1024,
+        )
+        await harness.login_as("scanner@example.com")
+        yield harness

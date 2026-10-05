@@ -14,13 +14,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
-from app.api.v1.routers import auth, health, knowledge
+from app.api.v1.dependencies import build_scan_job
+from app.api.v1.routers import auth, dashboard, health, knowledge, scans
+from app.application.use_cases.fail_scans import FailInterruptedScansUseCase
 from app.core.config import get_settings
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import configure_logging, get_logger
 from app.core.middleware import RequestContextMiddleware
 from app.core.rate_limit import limiter
+from app.infrastructure.jobs.asyncio_job_runner import AsyncioJobRunner
 from app.infrastructure.persistence.database import create_engine, create_session_factory
+from app.infrastructure.persistence.unit_of_work import SqlAlchemyUnitOfWork
 
 logger = get_logger(__name__)
 
@@ -31,11 +35,30 @@ async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
     configure_logging(settings.log_level)
 
     engine = create_engine(settings.database_url, echo=settings.debug)
-    app.state.session_factory = create_session_factory(engine)
+    session_factory = create_session_factory(engine)
+    app.state.session_factory = session_factory
+
+    job_runner = AsyncioJobRunner(
+        build_scan_job(session_factory), max_concurrent_jobs=settings.scan_max_concurrent_jobs
+    )
+    app.state.job_runner = job_runner
+
+    # Scan jobs run inside this process, so any scan a previous run left
+    # unfinished has no job anymore. This assumes a single backend process:
+    # with several, one starting up would fail the scans another is running.
+    try:
+        async with session_factory() as session:
+            interrupted = await FailInterruptedScansUseCase(SqlAlchemyUnitOfWork(session)).execute()
+        if interrupted:
+            logger.warning("interrupted_scans_marked_failed", count=interrupted)
+    except Exception:
+        # Not worth refusing to start over (e.g. migrations not applied yet).
+        logger.exception("interrupted_scans_recovery_failed")
 
     logger.info("app_startup", environment=settings.environment)
     yield
 
+    await job_runner.shutdown()
     await engine.dispose()
     logger.info("app_shutdown")
 
@@ -71,8 +94,9 @@ def create_app() -> FastAPI:
     app.include_router(health.router, prefix=settings.api_v1_prefix)
     app.include_router(auth.router, prefix=settings.api_v1_prefix)
     app.include_router(knowledge.router, prefix=settings.api_v1_prefix)
-    # Additional routers (scans, reports, dashboard) are registered here as
-    # they land in later phases.
+    app.include_router(scans.router, prefix=settings.api_v1_prefix)
+    app.include_router(dashboard.router, prefix=settings.api_v1_prefix)
+    # Report export is registered here when it lands, in Phase 7.
 
     return app
 

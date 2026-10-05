@@ -5,12 +5,16 @@ from types import TracebackType
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.ports.unit_of_work import UnitOfWork
+from app.infrastructure.persistence.repositories.finding_repository import (
+    SqlAlchemyFindingRepository,
+)
 from app.infrastructure.persistence.repositories.knowledge_document_repository import (
     SqlAlchemyKnowledgeDocumentRepository,
 )
 from app.infrastructure.persistence.repositories.refresh_token_repository import (
     SqlAlchemyRefreshTokenRepository,
 )
+from app.infrastructure.persistence.repositories.scan_repository import SqlAlchemyScanRepository
 from app.infrastructure.persistence.repositories.user_repository import SqlAlchemyUserRepository
 
 
@@ -25,6 +29,8 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
         self.users = SqlAlchemyUserRepository(session)
         self.refresh_tokens = SqlAlchemyRefreshTokenRepository(session)
         self.knowledge_documents = SqlAlchemyKnowledgeDocumentRepository(session)
+        self.scans = SqlAlchemyScanRepository(session)
+        self.findings = SqlAlchemyFindingRepository(session)
 
     async def __aenter__(self) -> SqlAlchemyUnitOfWork:
         return self

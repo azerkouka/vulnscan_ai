@@ -27,9 +27,9 @@ jobs:
           cache-dependency-path: backend/pyproject.toml
       - name: Install backend + dev dependencies
         working-directory: backend
-        # Extend to ".[dev,rag,chunking,export]" from Phase 4/7 onward, as
-        # those optional groups start being used.
-        run: pip install -e ".[dev,rag]"
+        # Extend to ".[dev,rag,chunking,export]" from Phase 7 onward, once
+        # the export group starts being used.
+        run: pip install -e ".[dev,rag,chunking]"
       - name: ruff
         working-directory: backend
         run: ruff check .
@@ -74,7 +74,7 @@ jobs:
           cache-dependency-path: backend/pyproject.toml
       - name: Install backend + dev dependencies
         working-directory: backend
-        run: pip install -e ".[dev,rag]"
+        run: pip install -e ".[dev,rag,chunking]"
       - name: Wait for ChromaDB
         # No --health-cmd on the service above: it'd run via `docker exec`
         # inside the chromadb image, which may not have curl. Polling from
@@ -127,9 +127,11 @@ jobs:
       - name: Install dependencies
         working-directory: frontend
         run: npm ci
-      - name: Unit tests (headless Chrome)
+      - name: Unit tests
         working-directory: frontend
-        run: npm test -- --watch=false --browsers=ChromeHeadless
+        # Vitest in jsdom (the Angular unit-test builder's default) - no
+        # browser to install on the runner.
+        run: npm test -- --watch=false
       - name: Production build
         working-directory: frontend
         run: npm run build

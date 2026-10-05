@@ -112,7 +112,14 @@ known-first-party = ["app"]
 # FastAPI's DI idiom is `param: T = Depends(...)` - these calls are
 # side-effect-free markers evaluated once per request by FastAPI itself, not
 # the mutable-default-argument footgun B008 warns about.
-extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Path", "fastapi.Body"]
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.Query",
+    "fastapi.Path",
+    "fastapi.Body",
+    "fastapi.File",
+    "fastapi.Form",
+]
 
 # ---------------------------------------------------------------------------
 # Black

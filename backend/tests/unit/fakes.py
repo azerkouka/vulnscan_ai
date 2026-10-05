@@ -8,23 +8,38 @@ vector store (and here, persistence/crypto) are always mocked in unit tests.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from dataclasses import replace
 from datetime import UTC, datetime
 from types import TracebackType
 from uuid import UUID, uuid4
 
+from app.domain.entities.finding import Finding
 from app.domain.entities.knowledge_document import KnowledgeDocument, KnowledgeDocumentRecord
 from app.domain.entities.refresh_token import RefreshToken
+from app.domain.entities.scan import Scan, ScanFile
 from app.domain.entities.user import User
 from app.domain.exceptions import InvalidCredentialsError
+from app.domain.ports.archive_extractor import ArchiveExtractor, ExtractedFile
+from app.domain.ports.code_chunker import CodeChunker
+from app.domain.ports.finding_repository import FindingRepository
+from app.domain.ports.job_runner import JobRunner
 from app.domain.ports.knowledge_document_repository import KnowledgeDocumentRepository
 from app.domain.ports.knowledge_indexer import KnowledgeIndexer
 from app.domain.ports.knowledge_retriever import KnowledgeRetriever, RetrievedKnowledge
+from app.domain.ports.llm_analyzer import AnalyzedFinding, LLMAnalyzer
 from app.domain.ports.password_hasher import PasswordHasher
 from app.domain.ports.refresh_token_repository import RefreshTokenRepository
+from app.domain.ports.scan_repository import ScanRepository
+from app.domain.ports.source_storage import SourceStorage
 from app.domain.ports.token_service import AccessTokenClaims, TokenService
 from app.domain.ports.unit_of_work import UnitOfWork
 from app.domain.ports.user_repository import UserRepository
+from app.domain.source_text import split_lines
+from app.domain.value_objects.code_chunk import ChunkKind, CodeChunk
+from app.domain.value_objects.code_location import CodeLocation
 from app.domain.value_objects.knowledge_source import KnowledgeSource
+from app.domain.value_objects.scan_status import ScanStatus
+from app.domain.value_objects.severity import Severity
 
 
 class FakeUserRepository(UserRepository):
@@ -152,11 +167,199 @@ class FakeKnowledgeRetriever(KnowledgeRetriever):
         return external_id in self._indexer.by_external_id
 
 
+class FakeScanRepository(ScanRepository):
+    def __init__(self) -> None:
+        self.by_id: dict[UUID, Scan] = {}
+        self.files_by_scan_id: dict[UUID, list[ScanFile]] = {}
+        self.status_history: list[ScanStatus] = []
+        """Every status written, in order - lets a test assert a scan went
+        through RUNNING, not just where it ended up."""
+        self.progress_history: list[int] = []
+
+    async def add(self, scan: Scan, files: Sequence[ScanFile]) -> None:
+        self.by_id[scan.id] = scan
+        self.files_by_scan_id[scan.id] = list(files)
+        self.status_history.append(scan.status)
+
+    async def get_by_id(self, scan_id: UUID) -> Scan | None:
+        return self.by_id.get(scan_id)
+
+    async def list_for_user(self, user_id: UUID, *, limit: int = 20, offset: int = 0) -> list[Scan]:
+        scans = sorted(
+            (s for s in self.by_id.values() if s.user_id == user_id),
+            key=lambda s: s.created_at,
+            reverse=True,
+        )
+        return scans[offset : offset + limit]
+
+    async def count_for_user(self, user_id: UUID) -> int:
+        return sum(1 for s in self.by_id.values() if s.user_id == user_id)
+
+    async def count_by_status_for_user(self, user_id: UUID) -> dict[ScanStatus, int]:
+        counts: dict[ScanStatus, int] = {}
+        for scan in self.by_id.values():
+            if scan.user_id == user_id:
+                counts[scan.status] = counts.get(scan.status, 0) + 1
+        return counts
+
+    async def list_files(self, scan_id: UUID) -> list[ScanFile]:
+        return sorted(self.files_by_scan_id.get(scan_id, []), key=lambda f: f.relative_path)
+
+    async def update(self, scan: Scan) -> None:
+        self.by_id[scan.id] = scan
+        self.status_history.append(scan.status)
+        self.progress_history.append(scan.progress_percent)
+
+    async def delete(self, scan_id: UUID) -> None:
+        self.by_id.pop(scan_id, None)
+        self.files_by_scan_id.pop(scan_id, None)
+
+    async def fail_unfinished(self, error_message: str) -> int:
+        unfinished = [
+            s for s in self.by_id.values() if s.status in (ScanStatus.PENDING, ScanStatus.RUNNING)
+        ]
+        for scan in unfinished:
+            self.by_id[scan.id] = replace(
+                scan,
+                status=ScanStatus.FAILED,
+                error_message=error_message,
+                completed_at=datetime.now(UTC),
+            )
+        return len(unfinished)
+
+
+class FakeFindingRepository(FindingRepository):
+    def __init__(self, scans: FakeScanRepository | None = None) -> None:
+        self.findings: list[Finding] = []
+        self._scans = scans
+        """Needed only by the per-user aggregates, to know whose scan a
+        finding belongs to."""
+
+    async def add_many(self, findings: Sequence[Finding]) -> None:
+        self.findings.extend(findings)
+
+    async def list_for_scan(self, scan_id: UUID) -> list[Finding]:
+        return [f for f in self.findings if f.scan_id == scan_id]
+
+    def _for_user(self, user_id: UUID) -> list[Finding]:
+        scans = self._scans.by_id if self._scans is not None else {}
+        return [
+            f for f in self.findings if f.scan_id in scans and scans[f.scan_id].user_id == user_id
+        ]
+
+    async def count_by_severity_for_user(self, user_id: UUID) -> dict[Severity, int]:
+        counts: dict[Severity, int] = {}
+        for finding in self._for_user(user_id):
+            counts[finding.severity] = counts.get(finding.severity, 0) + 1
+        return counts
+
+    async def top_cwes_for_user(self, user_id: UUID, *, limit: int = 5) -> list[tuple[str, int]]:
+        counts: dict[str, int] = {}
+        for finding in self._for_user(user_id):
+            if finding.cwe_id is not None:
+                counts[finding.cwe_id] = counts.get(finding.cwe_id, 0) + 1
+        return sorted(counts.items(), key=lambda item: (-item[1], item[0]))[:limit]
+
+
+class FakeSourceStorage(SourceStorage):
+    def __init__(self) -> None:
+        self.contents: dict[tuple[UUID, UUID], str] = {}
+        self.deleted_scan_ids: list[UUID] = []
+
+    async def save(self, scan_id: UUID, file_id: UUID, content: str) -> None:
+        self.contents[(scan_id, file_id)] = content
+
+    async def read(self, scan_id: UUID, file_id: UUID) -> str:
+        return self.contents[(scan_id, file_id)]
+
+    async def delete_scan(self, scan_id: UUID) -> None:
+        self.deleted_scan_ids.append(scan_id)
+        for key in [key for key in self.contents if key[0] == scan_id]:
+            del self.contents[key]
+
+
+class FakeArchiveExtractor(ArchiveExtractor):
+    def __init__(self, files: Sequence[ExtractedFile] = (), error: Exception | None = None) -> None:
+        self._files = list(files)
+        self._error = error
+        self.archives: list[bytes] = []
+
+    def extract(self, archive: bytes) -> list[ExtractedFile]:
+        self.archives.append(archive)
+        if self._error is not None:
+            raise self._error
+        return list(self._files)
+
+
+class FakeJobRunner(JobRunner):
+    def __init__(self) -> None:
+        self.enqueued_scan_ids: list[UUID] = []
+
+    async def enqueue_scan(self, scan_id: UUID) -> None:
+        self.enqueued_scan_ids.append(scan_id)
+
+
+class FakeCodeChunker(CodeChunker):
+    """Cuts a file into fixed-size line windows (the whole file by default) -
+    predictable chunk boundaries, with no grammar needed."""
+
+    def __init__(self, lines_per_chunk: int | None = None) -> None:
+        self._lines_per_chunk = lines_per_chunk
+
+    def supports(self, language: str) -> bool:
+        return True
+
+    def chunk(self, content: str, *, file_path: str, language: str) -> list[CodeChunk]:
+        lines = split_lines(content)
+        size = self._lines_per_chunk or max(len(lines), 1)
+        return [
+            CodeChunk(
+                content="\n".join(lines[start : start + size]),
+                language=language,
+                location=CodeLocation(file_path, start + 1, min(start + size, len(lines))),
+                kind=ChunkKind.MODULE,
+            )
+            for start in range(0, len(lines), size)
+        ]
+
+
+class FakeLLMAnalyzer(LLMAnalyzer):
+    """Scripted stand-in for the LLM: each call consumes the next entry of
+    `responses` (a list of findings to return, or an exception to raise);
+    once they run out, every further call gives the default answer."""
+
+    def __init__(
+        self,
+        responses: Sequence[list[AnalyzedFinding] | Exception] = (),
+        default: Sequence[AnalyzedFinding] = (),
+    ) -> None:
+        self._responses = list(responses)
+        self._default: list[AnalyzedFinding] | Exception = list(default)
+        self.calls: list[tuple[CodeChunk, list[RetrievedKnowledge]]] = []
+
+    def set_default(self, findings: Sequence[AnalyzedFinding]) -> None:
+        self._default = list(findings)
+
+    def set_default_error(self, error: Exception) -> None:
+        self._default = error
+
+    async def analyze(
+        self, chunk: CodeChunk, context: list[RetrievedKnowledge]
+    ) -> list[AnalyzedFinding]:
+        self.calls.append((chunk, context))
+        response = self._responses.pop(0) if self._responses else self._default
+        if isinstance(response, Exception):
+            raise response
+        return list(response)
+
+
 class FakeUnitOfWork(UnitOfWork):
     def __init__(self) -> None:
         self.users = FakeUserRepository()
         self.refresh_tokens = FakeRefreshTokenRepository()
         self.knowledge_documents = FakeKnowledgeDocumentRepository()
+        self.scans = FakeScanRepository()
+        self.findings = FakeFindingRepository(self.scans)
         self.committed = False
 
     async def __aenter__(self) -> FakeUnitOfWork:

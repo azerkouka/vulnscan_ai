@@ -61,8 +61,15 @@ class Settings(BaseSettings):
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "llama3"
     ollama_request_timeout_seconds: int = 120
+    ollama_num_ctx: int = 8192
+    llm_max_retries: int = 2
+
+    # --- Scan analysis ---
+    chunk_max_lines: int = 120
+    scan_max_concurrent_jobs: int = 1
 
     # --- Uploads / scan limits ---
+    upload_dir: str = "uploads"
     upload_max_size_mb: int = 10
     zip_max_uncompressed_mb: int = 100
     zip_max_files: int = 2000

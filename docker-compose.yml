@@ -10,7 +10,9 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
     ports:
-      - "5432:5432"
+      # Host port is configurable: 5432 is often already taken by a
+      # PostgreSQL installed on the host itself.
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -63,7 +65,10 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      DATABASE_URL: ${DATABASE_URL}
+      # Built from the same POSTGRES_* values the postgres service is created
+      # with, so the two can't drift apart. The DATABASE_URL line of .env is
+      # only for running the backend outside Docker.
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       CHROMA_HOST: chromadb
       CHROMA_PORT: 8000
       OLLAMA_BASE_URL: http://ollama:11434
@@ -78,6 +83,42 @@ services:
         condition: service_started
     volumes:
       - backend_uploads:/app/uploads
+    networks: [vulnscan-net]
+
+  # The complete backend test suite, on Linux - where every optional
+  # dependency installs, unlike on Windows (see README, "Backend checks").
+  # Not started by `docker compose up`; run it on demand with:
+  #   docker compose run --rm backend-tests
+  backend-tests:
+    profiles: [test]
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    # root: installs the dev dependencies into the image's venv at start-up.
+    user: root
+    working_dir: /app
+    environment:
+      # Always the *_test database: the suite creates and drops every table,
+      # so it must never be pointed at the development database.
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}_test
+      CHROMA_HOST: chromadb
+      CHROMA_PORT: 8000
+      JWT_SECRET_KEY: test-secret-key-not-for-production-use-only
+      ENVIRONMENT: test
+      AUTH_RATE_LIMIT: 1000/minute
+    volumes:
+      # The working tree, not the copy baked into the image (which leaves
+      # tests/ out), so the run always reflects the current code.
+      - ./backend:/app
+      # Chroma downloads its embedding model (~80 MB) on first use; kept in a
+      # volume so each run does not fetch it again.
+      - backend_tests_model_cache:/root/.cache/chroma
+    depends_on:
+      postgres:
+        condition: service_healthy
+      chromadb:
+        condition: service_healthy
+    command: sh -c "pip install -q -e '.[dev]' && python -m pytest -p no:cacheprovider"
     networks: [vulnscan-net]
 
   frontend:
@@ -106,4 +147,5 @@ volumes:
   chroma_data:
   ollama_data:
   backend_uploads:
+  backend_tests_model_cache:
   frontend_node_modules:

@@ -34,3 +34,30 @@ class UserNotFoundError(DomainError):
 
 class KnowledgeDocumentNotFoundError(DomainError):
     """Raised when a referenced knowledge document external_id does not exist."""
+
+
+class ScanNotFoundError(DomainError):
+    """Raised when a scan id does not exist - or belongs to another user,
+    which is deliberately indistinguishable from the caller's side."""
+
+
+class ScanInProgressError(DomainError):
+    """Raised when an operation needs the scan to have finished first."""
+
+
+class InvalidSourceError(DomainError):
+    """Raised when submitted source can't be scanned (empty, binary,
+    unsupported extension or language)."""
+
+
+class SourceTooLargeError(DomainError):
+    """Raised when submitted source exceeds the configured upload limit."""
+
+
+class InvalidArchiveError(DomainError):
+    """Raised when an uploaded archive is corrupt or trips a safety limit."""
+
+
+class LLMAnalysisError(DomainError):
+    """Raised when the LLM could not produce a valid analysis for a chunk,
+    even after retries."""

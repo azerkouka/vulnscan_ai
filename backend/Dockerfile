@@ -45,6 +45,10 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 WORKDIR /app
 COPY --chown=appuser:appuser . .
+# Submitted source is stored here (UPLOAD_DIR). Created and owned up front
+# so the named volume docker-compose mounts on it is writable by appuser -
+# a volume mounted on a path missing from the image would belong to root.
+RUN mkdir -p /app/uploads && chown appuser:appuser /app/uploads
 
 USER appuser
 EXPOSE 8000
