@@ -1,0 +1,101 @@
+<header class="page-header">
+  <div>
+    <h1>Welcome, {{ greetingName() }}</h1>
+    <p class="muted">An overview of your scans and what they found.</p>
+  </div>
+  <a class="btn btn-primary" routerLink="/scans/new">New scan</a>
+</header>
+
+@if (loadError(); as message) {
+  <p class="alert alert-error" role="alert">{{ message }}</p>
+}
+
+@if (summary(); as currentSummary) {
+  @if (currentSummary.total_scans === 0) {
+    <div class="card empty-state">
+      <h2>No scans yet</h2>
+      <p class="muted">
+        Submit a snippet, a source file or a project archive, and its report will show up here.
+      </p>
+      <a class="btn btn-primary" routerLink="/scans/new">Start your first scan</a>
+    </div>
+  } @else {
+    <dl class="stat-grid">
+      <div class="card stat">
+        <dt>Scans</dt>
+        <dd>{{ currentSummary.total_scans }}</dd>
+      </div>
+      <div class="card stat">
+        <dt>Completed</dt>
+        <dd>{{ currentSummary.scans_by_status.COMPLETED }}</dd>
+      </div>
+      <div class="card stat">
+        <dt>In progress</dt>
+        <dd>{{ inProgressCount() }}</dd>
+      </div>
+      <div class="card stat">
+        <dt>Failed</dt>
+        <dd>{{ currentSummary.scans_by_status.FAILED }}</dd>
+      </div>
+      <div class="card stat">
+        <dt>Findings</dt>
+        <dd>{{ currentSummary.total_findings }}</dd>
+      </div>
+    </dl>
+
+    <div class="dashboard-grid">
+      <section class="card" aria-labelledby="severity-title">
+        <h2 id="severity-title">Findings by severity</h2>
+        @if (currentSummary.total_findings === 0) {
+          <p class="muted">No finding in any scan so far.</p>
+        } @else {
+          <ul class="bars">
+            @for (bar of severityBars(); track bar.severity) {
+              <li>
+                <span class="bar-label">{{ bar.severity | titlecase }}</span>
+                <span class="bar-track" aria-hidden="true">
+                  <span
+                    class="bar-fill"
+                    [attr.data-severity]="bar.severity"
+                    [style.width.%]="bar.percent"
+                  ></span>
+                </span>
+                <span class="bar-count">{{ bar.count }}</span>
+              </li>
+            }
+          </ul>
+        }
+      </section>
+
+      <section class="card" aria-labelledby="cwe-title">
+        <h2 id="cwe-title">Most frequent weaknesses</h2>
+        @if (currentSummary.top_cwes.length === 0) {
+          <p class="muted">No classified finding yet.</p>
+        } @else {
+          <ol class="ranking">
+            @for (item of currentSummary.top_cwes; track item.cwe_id) {
+              <li>
+                <span>{{ item.cwe_id }}</span>
+                <span class="muted"
+                  >{{ item.count }} {{ item.count === 1 ? 'finding' : 'findings' }}</span
+                >
+              </li>
+            }
+          </ol>
+        }
+      </section>
+    </div>
+
+    <section aria-labelledby="recent-title">
+      <div class="section-header">
+        <h2 id="recent-title">Recent scans</h2>
+        <a routerLink="/scans">View all</a>
+      </div>
+      <div class="card card-flush">
+        <app-scan-table [scans]="currentSummary.recent_scans" />
+      </div>
+    </section>
+  }
+} @else if (!loadError()) {
+  <p class="muted" role="status">Loading dashboard…</p>
+}

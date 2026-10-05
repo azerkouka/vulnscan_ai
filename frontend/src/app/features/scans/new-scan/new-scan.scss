@@ -1,0 +1,15 @@
+.new-scan,
+.new-scan-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.field select {
+  max-width: 18rem;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+}

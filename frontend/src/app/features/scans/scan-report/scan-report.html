@@ -1,0 +1,116 @@
+@if (notFound()) {
+  <div class="card empty-state">
+    <h1>Scan not found</h1>
+    <p class="muted">It may have been deleted, or the address is wrong.</p>
+    <a class="btn btn-primary" routerLink="/scans">Back to your scans</a>
+  </div>
+} @else if (report(); as currentReport) {
+  <header class="page-header">
+    <div>
+      <p class="breadcrumb"><a routerLink="/scans">Scans</a> <span aria-hidden="true">/</span></p>
+      <h1>
+        {{ sourceLabel(currentReport.scan.source_type) }} scan
+        <app-status-badge [status]="currentReport.scan.status" />
+      </h1>
+      <p class="muted">
+        Submitted {{ currentReport.scan.created_at | date: 'medium' }} ·
+        {{ currentReport.files.length }}
+        {{ currentReport.files.length === 1 ? 'file' : 'files' }} · {{ totalLines() }}
+        {{ totalLines() === 1 ? 'line' : 'lines' }}
+      </p>
+    </div>
+    <button
+      class="btn btn-ghost btn-danger"
+      type="button"
+      [disabled]="inProgress() || deleting()"
+      [attr.title]="inProgress() ? 'A scan can be deleted once it has finished' : null"
+      (click)="remove()"
+    >
+      Delete scan
+    </button>
+  </header>
+
+  @if (actionError(); as message) {
+    <p class="alert alert-error" role="alert">{{ message }}</p>
+  }
+  @if (loadError(); as message) {
+    <p class="alert alert-error" role="alert">{{ message }}</p>
+  }
+
+  @if (inProgress()) {
+    <section class="card progress-card" aria-labelledby="progress-title">
+      <h2 id="progress-title">
+        {{ currentReport.scan.status === 'PENDING' ? 'Waiting to start' : 'Analyzing your code' }}
+      </h2>
+      <progress
+        max="100"
+        [value]="currentReport.scan.progress_percent"
+        aria-labelledby="progress-title"
+      ></progress>
+      <p class="muted" role="status">
+        {{ currentReport.scan.progress_percent }}% ·
+        {{ currentReport.scan.total_findings }}
+        {{ currentReport.scan.total_findings === 1 ? 'finding' : 'findings' }} so far. The local
+        model reviews the code piece by piece, which can take several minutes. You can leave this
+        page - the scan carries on.
+      </p>
+    </section>
+  }
+
+  @if (currentReport.scan.status === 'FAILED') {
+    <p class="alert alert-error" role="alert">
+      <strong>This scan failed.</strong>
+      {{ currentReport.scan.error_message ?? 'No further detail is available.' }}
+    </p>
+  } @else if (currentReport.scan.status === 'COMPLETED' && currentReport.scan.error_message) {
+    <p class="alert alert-warning" role="status">{{ currentReport.scan.error_message }}</p>
+  }
+
+  @if (currentReport.findings.length > 0) {
+    <div class="filters" role="group" aria-label="Filter findings by severity">
+      <button
+        class="chip"
+        type="button"
+        [attr.aria-pressed]="filter() === 'ALL'"
+        (click)="filter.set('ALL')"
+      >
+        All <span class="chip-count">{{ currentReport.findings.length }}</span>
+      </button>
+      @for (severity of severities; track severity) {
+        @if (currentReport.severity_counts[severity] > 0) {
+          <button
+            class="chip"
+            type="button"
+            [attr.data-severity]="severity"
+            [attr.aria-pressed]="filter() === severity"
+            (click)="filter.set(severity)"
+          >
+            {{ severity | titlecase }}
+            <span class="chip-count">{{ currentReport.severity_counts[severity] }}</span>
+          </button>
+        }
+      }
+    </div>
+
+    <ol class="findings">
+      @for (finding of visibleFindings(); track finding.id; let first = $first) {
+        <li><app-finding-card [finding]="finding" [expanded]="first" /></li>
+      }
+    </ol>
+  } @else if (currentReport.scan.status === 'COMPLETED') {
+    <div class="card empty-state">
+      <h2>No vulnerabilities found</h2>
+      <p class="muted">
+        The model reported nothing in this code. This is an automated review: an empty report is not
+        proof that the code is secure.
+      </p>
+    </div>
+  }
+} @else if (loadError(); as message) {
+  <div class="card empty-state">
+    <p class="alert alert-error" role="alert">{{ message }}</p>
+    <a class="btn btn-ghost" routerLink="/scans">Back to your scans</a>
+  </div>
+} @else {
+  <p class="muted" role="status">Loading scan…</p>
+}

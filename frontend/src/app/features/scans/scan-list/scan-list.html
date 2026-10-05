@@ -1,0 +1,61 @@
+<header class="page-header">
+  <div>
+    <h1>Scans</h1>
+    <p class="muted">Every scan you have submitted, most recent first.</p>
+  </div>
+  <a class="btn btn-primary" routerLink="/scans/new">New scan</a>
+</header>
+
+@if (actionError(); as message) {
+  <p class="alert alert-error" role="alert">{{ message }}</p>
+}
+
+@if (loadError(); as message) {
+  <div class="card empty-state">
+    <p class="alert alert-error" role="alert">{{ message }}</p>
+    <button class="btn btn-ghost" type="button" (click)="retry()">Try again</button>
+  </div>
+} @else if (page(); as currentPage) {
+  @if (currentPage.total === 0) {
+    <div class="card empty-state">
+      <h2>No scans yet</h2>
+      <p class="muted">Submit a snippet, a source file or a project archive to get a report.</p>
+      <a class="btn btn-primary" routerLink="/scans/new">Start your first scan</a>
+    </div>
+  } @else {
+    <div class="card card-flush">
+      <app-scan-table
+        [scans]="currentPage.scans"
+        [deletable]="true"
+        [deletingId]="deletingId()"
+        (remove)="remove($event)"
+      />
+    </div>
+
+    <nav class="pagination" aria-label="Scan pages">
+      <p class="muted" aria-live="polite">
+        {{ rangeStart() }}–{{ rangeEnd() }} of {{ currentPage.total }}
+      </p>
+      <div class="pagination-buttons">
+        <button
+          class="btn btn-ghost btn-small"
+          type="button"
+          [disabled]="!hasPrevious()"
+          (click)="previousPage()"
+        >
+          Previous
+        </button>
+        <button
+          class="btn btn-ghost btn-small"
+          type="button"
+          [disabled]="!hasNext()"
+          (click)="nextPage()"
+        >
+          Next
+        </button>
+      </div>
+    </nav>
+  }
+} @else {
+  <p class="muted" role="status">Loading scans…</p>
+}

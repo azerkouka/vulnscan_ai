@@ -1,0 +1,100 @@
+<header class="page-header">
+  <div>
+    <h1>New scan</h1>
+    <p class="muted">
+      The code is analyzed statically by a local model. It is never executed, and it never leaves
+      your installation.
+    </p>
+  </div>
+</header>
+
+<form class="card new-scan" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+  <div class="tabs" role="tablist" aria-label="What to scan">
+    <button
+      type="button"
+      role="tab"
+      id="tab-code"
+      aria-controls="panel-code"
+      [attr.aria-selected]="mode() === 'code'"
+      [class.active]="mode() === 'code'"
+      (click)="selectMode('code')"
+    >
+      Paste code
+    </button>
+    <button
+      type="button"
+      role="tab"
+      id="tab-file"
+      aria-controls="panel-file"
+      [attr.aria-selected]="mode() === 'file'"
+      [class.active]="mode() === 'file'"
+      (click)="selectMode('file')"
+    >
+      Upload a file
+    </button>
+  </div>
+
+  @if (errorMessage(); as message) {
+    <p class="alert alert-error" role="alert">{{ message }}</p>
+  }
+
+  @if (mode() === 'code') {
+    <div class="new-scan-panel" role="tabpanel" id="panel-code" aria-labelledby="tab-code">
+      <div class="field">
+        <label for="scan-language">Language <span class="optional">(optional)</span></label>
+        <select id="scan-language" formControlName="language">
+          <option value="">Not specified</option>
+          @for (language of languages; track language.value) {
+            <option [value]="language.value">{{ language.label }}</option>
+          }
+        </select>
+        <p class="field-hint">
+          Lets the analysis split the code function by function instead of by line count.
+        </p>
+      </div>
+
+      <div class="field">
+        <label for="scan-code">Code</label>
+        <textarea
+          id="scan-code"
+          class="code-input"
+          formControlName="code"
+          rows="16"
+          spellcheck="false"
+          autocapitalize="off"
+          autocomplete="off"
+          [attr.aria-invalid]="inputError() !== null"
+          [attr.aria-describedby]="inputError() !== null ? 'scan-input-error' : null"
+        ></textarea>
+      </div>
+    </div>
+  } @else {
+    <div class="new-scan-panel" role="tabpanel" id="panel-file" aria-labelledby="tab-file">
+      <div class="field">
+        <label for="scan-file">Source file or project archive</label>
+        <input
+          id="scan-file"
+          type="file"
+          [accept]="acceptedExtensions"
+          [attr.aria-invalid]="inputError() !== null"
+          aria-describedby="scan-file-hint"
+          (change)="onFileSelected($event)"
+        />
+        <p class="field-hint" id="scan-file-hint">
+          One source file ({{ extensionList }}), up to {{ maxUploadMb }} MB. A .zip is unpacked and
+          every source file inside is scanned.
+        </p>
+      </div>
+    </div>
+  }
+
+  @if (inputError(); as problem) {
+    <p class="field-error" id="scan-input-error" role="alert">{{ problem }}</p>
+  }
+
+  <div class="form-actions">
+    <button class="btn btn-primary" type="submit" [disabled]="submitting()">
+      {{ submitting() ? 'Starting…' : 'Start scan' }}
+    </button>
+  </div>
+</form>

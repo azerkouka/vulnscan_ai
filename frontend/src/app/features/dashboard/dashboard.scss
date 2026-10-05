@@ -1,0 +1,83 @@
+.stat-grid {
+  margin: 0 0 1rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 1rem;
+}
+
+.stat {
+  padding: 1rem 1.25rem;
+
+  dt {
+    color: var(--color-muted);
+    font-size: 0.875rem;
+  }
+
+  dd {
+    margin: 0;
+    font-size: 1.75rem;
+    font-weight: 700;
+    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.card h2 {
+  margin-bottom: 0.75rem;
+}
+
+.bars,
+.ranking {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.bars li {
+  display: grid;
+  grid-template-columns: 4.5rem 1fr 2.5rem;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.bar-track {
+  height: 0.625rem;
+  border-radius: 999px;
+  background: var(--color-bg);
+  overflow: hidden;
+}
+
+.bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--severity-color, var(--color-muted));
+}
+
+.bar-count {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.ranking li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 0.75rem;
+}

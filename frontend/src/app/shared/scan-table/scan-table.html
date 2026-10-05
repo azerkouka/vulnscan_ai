@@ -1,0 +1,50 @@
+<div class="table-wrap">
+  <table class="table">
+    <thead>
+      <tr>
+        <th scope="col">Submitted</th>
+        <th scope="col">Source</th>
+        <th scope="col">Status</th>
+        <th scope="col" class="numeric">Files</th>
+        <th scope="col" class="numeric">Findings</th>
+        <th scope="col"><span class="visually-hidden">Actions</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (scan of scans(); track scan.id) {
+        <tr>
+          <td>
+            <a [routerLink]="['/scans', scan.id]">{{ scan.created_at | date: 'medium' }}</a>
+          </td>
+          <td>{{ sourceLabel(scan.source_type) }}</td>
+          <td>
+            <app-status-badge [status]="scan.status" />
+            @if (scan.status === 'RUNNING') {
+              <span class="muted progress-text">{{ scan.progress_percent }}%</span>
+            }
+          </td>
+          <td class="numeric">{{ scan.total_files }}</td>
+          <td class="numeric">{{ scan.total_findings }}</td>
+          <td class="actions">
+            <a class="btn btn-ghost btn-small" [routerLink]="['/scans', scan.id]">
+              {{ scan.status === 'COMPLETED' ? 'View report' : 'View' }}
+            </a>
+            @if (deletable()) {
+              <button
+                class="btn btn-ghost btn-small btn-danger"
+                type="button"
+                [disabled]="isInProgress(scan.status) || deletingId() === scan.id"
+                [attr.title]="
+                  isInProgress(scan.status) ? 'A scan can be deleted once it has finished' : null
+                "
+                (click)="remove.emit(scan)"
+              >
+                Delete
+              </button>
+            }
+          </td>
+        </tr>
+      }
+    </tbody>
+  </table>
+</div>

@@ -1,0 +1,90 @@
+<main class="auth-page">
+  <section class="card auth-card" aria-labelledby="register-title">
+    <app-brand />
+    <div>
+      <h1 id="register-title">Create your account</h1>
+      <p class="muted">Scan source code against OWASP, CWE and MITRE ATT&amp;CK.</p>
+    </div>
+
+    <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+      @if (errorMessage(); as message) {
+        <p class="alert alert-error" role="alert">{{ message }}</p>
+      }
+
+      <div class="field">
+        <label for="register-name">Full name <span class="optional">(optional)</span></label>
+        <input
+          id="register-name"
+          type="text"
+          formControlName="fullName"
+          autocomplete="name"
+          [attr.aria-invalid]="showError('fullName')"
+          [attr.aria-describedby]="showError('fullName') ? 'register-name-error' : null"
+        />
+        @if (showError('fullName')) {
+          <p class="field-error" id="register-name-error">This name is too long.</p>
+        }
+      </div>
+
+      <div class="field">
+        <label for="register-email">Email</label>
+        <input
+          id="register-email"
+          type="email"
+          formControlName="email"
+          autocomplete="email"
+          [attr.aria-invalid]="showError('email')"
+          [attr.aria-describedby]="showError('email') ? 'register-email-error' : null"
+        />
+        @if (showError('email')) {
+          <p class="field-error" id="register-email-error">Enter a valid email address.</p>
+        }
+      </div>
+
+      <div class="field">
+        <label for="register-password">Password</label>
+        <input
+          id="register-password"
+          type="password"
+          formControlName="password"
+          autocomplete="new-password"
+          [attr.aria-invalid]="showError('password')"
+          aria-describedby="register-password-hint"
+        />
+        <p
+          id="register-password-hint"
+          [class.field-hint]="!showError('password')"
+          [class.field-error]="showError('password')"
+        >
+          At least {{ passwordMinLength }} characters.
+        </p>
+      </div>
+
+      <div class="field">
+        <label for="register-password-confirmation">Confirm password</label>
+        <input
+          id="register-password-confirmation"
+          type="password"
+          formControlName="passwordConfirmation"
+          autocomplete="new-password"
+          [attr.aria-invalid]="showMismatch()"
+          [attr.aria-describedby]="showMismatch() ? 'register-confirmation-error' : null"
+        />
+        @if (showMismatch()) {
+          <p class="field-error" id="register-confirmation-error">
+            The two passwords do not match.
+          </p>
+        }
+      </div>
+
+      <button class="btn btn-primary btn-block" type="submit" [disabled]="submitting()">
+        {{ submitting() ? 'Creating account…' : 'Create account' }}
+      </button>
+    </form>
+
+    <p class="auth-switch">
+      Already have an account?
+      <a routerLink="/login" queryParamsHandling="preserve">Sign in</a>
+    </p>
+  </section>
+</main>

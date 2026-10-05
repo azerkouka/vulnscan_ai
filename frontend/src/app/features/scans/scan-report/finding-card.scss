@@ -1,0 +1,67 @@
+.finding {
+  padding: 0;
+}
+
+summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  padding: 0.875rem 1.25rem;
+  cursor: pointer;
+  border-radius: var(--radius);
+}
+
+.finding-title {
+  font-weight: 600;
+}
+
+.finding-location {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  overflow-wrap: anywhere;
+}
+
+.finding-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 1rem 1.25rem 1.25rem;
+  border-top: 1px solid var(--color-border);
+}
+
+h3 {
+  margin: 0 0 0.375rem;
+  font-size: 0.8125rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-muted);
+}
+
+.finding-meta {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 2.5rem;
+
+  dt {
+    font-size: 0.8125rem;
+    color: var(--color-muted);
+  }
+
+  dd {
+    margin: 0;
+  }
+}
+
+.references {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.prose {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

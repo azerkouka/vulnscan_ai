@@ -1,0 +1,31 @@
+<header class="shell-header">
+  <a class="shell-brand" routerLink="/dashboard" aria-label="VulnScan AI, go to dashboard">
+    <app-brand />
+  </a>
+
+  <nav class="shell-nav" aria-label="Main">
+    @for (item of navItems; track item.path) {
+      <a
+        [routerLink]="item.path"
+        routerLinkActive="active"
+        [routerLinkActiveOptions]="{ exact: item.exact }"
+        ariaCurrentWhenActive="page"
+      >
+        {{ item.label }}
+      </a>
+    }
+  </nav>
+
+  <a class="btn btn-primary btn-small" routerLink="/scans/new">New scan</a>
+
+  <div class="shell-user">
+    @if (user(); as currentUser) {
+      <span class="shell-user-email" [title]="currentUser.email">{{ currentUser.email }}</span>
+    }
+    <button class="btn btn-ghost" type="button" (click)="signOut()">Sign out</button>
+  </div>
+</header>
+
+<main class="shell-main">
+  <router-outlet />
+</main>

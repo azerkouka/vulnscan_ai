@@ -1,1 +1,539 @@
-/* You can add global styles to this file, and also import other style files */
+/*
+ * Global styles: design tokens and the handful of primitives (buttons, form
+ * fields, cards, alerts) shared by every page. Component stylesheets only
+ * hold what is specific to their own layout.
+ */
+
+:root {
+  color-scheme: light dark;
+
+  --color-bg: #f5f6f8;
+  --color-surface: #ffffff;
+  --color-text: #171a21;
+  --color-muted: #5b6472;
+  --color-border: #d9dde4;
+  --color-accent: #2f5bd8;
+  --color-accent-hover: #2449b4;
+  --color-on-accent: #ffffff;
+  --color-danger: #b42318;
+  --color-danger-bg: #fdecea;
+  --color-success: #1a7f4b;
+  --color-warning: #8a5a00;
+  --color-warning-bg: #fff4d6;
+  --color-focus: #2f5bd8;
+  --color-code-bg: #f1f3f6;
+
+  --severity-critical: #b42318;
+  --severity-high: #c2410c;
+  --severity-medium: #a16207;
+  --severity-low: #1d4ed8;
+  --severity-info: #5b6472;
+
+  --radius: 8px;
+  --shadow: 0 1px 2px rgb(16 24 40 / 6%), 0 4px 16px rgb(16 24 40 / 6%);
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Code', 'SF Mono', Menlo, Consolas, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #0f1218;
+    --color-surface: #181c25;
+    --color-text: #e8eaf0;
+    --color-muted: #9aa3b2;
+    --color-border: #2c3340;
+    --color-accent: #7b9cff;
+    --color-accent-hover: #9ab3ff;
+    --color-on-accent: #0f1218;
+    --color-danger: #ff8a80;
+    --color-danger-bg: #3a1a1a;
+    --color-success: #5fd39a;
+    --color-warning: #f5c451;
+    --color-warning-bg: #3a2f10;
+    --color-focus: #9ab3ff;
+    --color-code-bg: #11141b;
+
+    --severity-critical: #ff8a80;
+    --severity-high: #ffa466;
+    --severity-medium: #f5c451;
+    --severity-low: #8fb4ff;
+    --severity-info: #9aa3b2;
+    --shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 4px 16px rgb(0 0 0 / 30%);
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: 1.5rem;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+
+h2 {
+  font-size: 1.0625rem;
+}
+
+a {
+  color: var(--color-accent);
+  text-underline-offset: 2px;
+}
+
+a:hover {
+  color: var(--color-accent-hover);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.muted {
+  color: var(--color-muted);
+}
+
+/* --- Card ----------------------------------------------------------------- */
+
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.5rem;
+}
+
+/* --- Buttons -------------------------------------------------------------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 2.5rem;
+  padding: 0 1rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background-color 0.15s ease;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+  color: var(--color-on-accent);
+}
+
+.btn-ghost {
+  background: transparent;
+  border-color: var(--color-border);
+  color: var(--color-text);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: var(--color-bg);
+}
+
+.btn-block {
+  width: 100%;
+}
+
+/* --- Form fields ---------------------------------------------------------- */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.field label {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.field .optional {
+  font-weight: 400;
+  color: var(--color-muted);
+}
+
+.field input:not([type='file']),
+.field select,
+.field textarea {
+  min-height: 2.5rem;
+  padding: 0 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+}
+
+.field textarea {
+  padding: 0.75rem;
+  resize: vertical;
+}
+
+.field input[type='file'] {
+  font: inherit;
+  color: var(--color-text);
+}
+
+.field .code-input {
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  tab-size: 4;
+  white-space: pre;
+  overflow: auto;
+}
+
+.field input[aria-invalid='true'],
+.field textarea[aria-invalid='true'] {
+  border-color: var(--color-danger);
+}
+
+.field-hint,
+.field-error {
+  font-size: 0.8125rem;
+}
+
+.field-hint {
+  color: var(--color-muted);
+}
+
+.field-error {
+  color: var(--color-danger);
+}
+
+/* --- Alerts --------------------------------------------------------------- */
+
+.alert {
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius);
+  font-size: 0.9375rem;
+}
+
+.alert-error {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+  border: 1px solid color-mix(in srgb, var(--color-danger) 35%, transparent);
+}
+
+/* --- Signed-out pages (login, register) ----------------------------------- */
+
+.auth-page {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem 1rem;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 26rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.auth-card form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.auth-switch {
+  font-size: 0.9375rem;
+  color: var(--color-muted);
+  text-align: center;
+}
+
+.alert-warning {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+  border: 1px solid color-mix(in srgb, var(--color-warning) 35%, transparent);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* --- Page scaffolding (signed-in pages) ----------------------------------- */
+
+.page-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+}
+
+.card-flush {
+  padding: 0;
+  overflow: hidden;
+}
+
+.btn-small {
+  min-height: 2rem;
+  padding: 0 0.75rem;
+  font-size: 0.875rem;
+}
+
+.btn-danger {
+  color: var(--color-danger);
+}
+
+/* --- Badges and filter chips ---------------------------------------------- */
+
+[data-severity='CRITICAL'] {
+  --severity-color: var(--severity-critical);
+}
+
+[data-severity='HIGH'] {
+  --severity-color: var(--severity-high);
+}
+
+[data-severity='MEDIUM'] {
+  --severity-color: var(--severity-medium);
+}
+
+[data-severity='LOW'] {
+  --severity-color: var(--severity-low);
+}
+
+[data-severity='INFO'] {
+  --severity-color: var(--severity-info);
+}
+
+[data-status='PENDING'] {
+  --status-color: var(--color-muted);
+}
+
+[data-status='RUNNING'] {
+  --status-color: var(--color-accent);
+}
+
+[data-status='COMPLETED'] {
+  --status-color: var(--color-success);
+}
+
+[data-status='FAILED'] {
+  --status-color: var(--color-danger);
+}
+
+.badge {
+  --badge-color: var(--severity-color, var(--status-color, var(--color-muted)));
+
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--badge-color) 40%, transparent);
+  background: color-mix(in srgb, var(--badge-color) 12%, transparent);
+  color: var(--badge-color);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2rem;
+  padding: 0 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--severity-color, var(--color-text));
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.chip[aria-pressed='true'] {
+  border-color: currentcolor;
+  background: color-mix(in srgb, currentcolor 12%, transparent);
+}
+
+.chip-count {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+}
+
+/* --- Tabs ----------------------------------------------------------------- */
+
+.tabs {
+  display: flex;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.tabs button {
+  padding: 0.5rem 0.875rem;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  background: none;
+  color: var(--color-muted);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tabs button.active {
+  color: var(--color-accent);
+  border-bottom-color: var(--color-accent);
+}
+
+/* --- Tables --------------------------------------------------------------- */
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+}
+
+.table th,
+.table td {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.table th {
+  color: var(--color-muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.table tbody tr + tr td {
+  border-top: 1px solid var(--color-border);
+}
+
+.table .numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.table .actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.progress-text {
+  margin-left: 0.5rem;
+  font-size: 0.8125rem;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 0.75rem;
+}
+
+.pagination-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* --- Code ----------------------------------------------------------------- */
+
+.code-block {
+  margin: 0;
+  padding: 0.75rem 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-code-bg);
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  overflow-x: auto;
+  tab-size: 4;
+}
+
+pre.code-block {
+  padding: 0.75rem 1rem;
+}
+
+.code-line {
+  display: flex;
+  padding-right: 1rem;
+  min-width: max-content;
+}
+
+.code-line-number {
+  flex: none;
+  width: 3.5rem;
+  padding-right: 1rem;
+  text-align: right;
+  color: var(--color-muted);
+  user-select: none;
+}
+
+.code-line-text {
+  white-space: pre;
+}
