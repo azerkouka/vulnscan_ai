@@ -81,3 +81,10 @@ class DashboardSummary:
     findings_by_severity: dict[Severity, int]
     top_cwes: list[CweCount]
     recent_scans: list[ScanSummary]
+
+
+@dataclass(frozen=True, slots=True)
+class ExportedReport:
+    content: bytes
+    media_type: str
+    filename: str

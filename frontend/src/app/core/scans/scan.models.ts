@@ -4,6 +4,8 @@ export type ScanStatus = 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED';
 export type SourceType = 'SNIPPET' | 'FILE' | 'ZIP';
 export type Severity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO';
 export type ReferenceSource = 'OWASP' | 'CWE' | 'ATTACK' | 'OTHER';
+/** File formats a finished scan's report can be downloaded in. */
+export type ReportFormat = 'json' | 'pdf';
 
 /** Most severe first - the order reports and charts use. */
 export const SEVERITIES: readonly Severity[] = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'];

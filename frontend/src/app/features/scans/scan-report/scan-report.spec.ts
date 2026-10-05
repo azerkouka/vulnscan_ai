@@ -3,12 +3,13 @@ import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
-import { Observable, of, throwError } from 'rxjs';
+import { Observable, Subject, of, throwError } from 'rxjs';
 
 import { makeFinding, makeReport, makeScan, makeScanFile } from '../../../../testing/scan-fixtures';
+import { FileSaver } from '../../../core/api/file-saver';
 import { POLL_INTERVAL } from '../../../core/scans/poll';
 import { ScanService } from '../../../core/scans/scan-service';
-import { ScanReport } from '../../../core/scans/scan.models';
+import { ReportFormat, ScanReport } from '../../../core/scans/scan.models';
 import { ScanReportPage } from './scan-report';
 
 @Component({ template: '' })
@@ -17,19 +18,28 @@ class Blank {}
 describe('ScanReportPage', () => {
   let getReport: ReturnType<typeof vi.fn<(scanId: string) => Observable<ScanReport>>>;
   let remove: ReturnType<typeof vi.fn<(scanId: string) => Observable<void>>>;
+  let downloadReport: ReturnType<
+    typeof vi.fn<(scanId: string, format: ReportFormat) => Observable<Blob>>
+  >;
+  let save: ReturnType<typeof vi.fn<(content: Blob, filename: string) => void>>;
   let harness: RouterTestingHarness;
   let page: HTMLElement;
 
   beforeEach(() => {
     getReport = vi.fn<(scanId: string) => Observable<ScanReport>>();
     remove = vi.fn<(scanId: string) => Observable<void>>(() => of(undefined));
+    downloadReport = vi.fn<(scanId: string, format: ReportFormat) => Observable<Blob>>(() =>
+      of(new Blob(['report'])),
+    );
+    save = vi.fn<(content: Blob, filename: string) => void>();
     TestBed.configureTestingModule({
       providers: [
         provideRouter([
           { path: 'scans/:id', component: ScanReportPage },
           { path: '**', component: Blank },
         ]),
-        { provide: ScanService, useValue: { getReport, delete: remove } },
+        { provide: ScanService, useValue: { getReport, delete: remove, downloadReport } },
+        { provide: FileSaver, useValue: { save } },
         { provide: POLL_INTERVAL, useValue: 5 },
       ],
     });
@@ -246,6 +256,76 @@ describe('ScanReportPage', () => {
 
     expect(text('.alert-error')).toContain('Cannot reach the server');
     expect(page.querySelector('h1')).toBeNull();
+  });
+
+  it.each(['json', 'pdf'] as const)('downloads the report as %s', async (format) => {
+    const file = new Blob(['report']);
+    downloadReport.mockReturnValue(of(file));
+    getReport.mockReturnValue(of(makeReport(makeScan({ id: 'scan-1' }), [makeFinding()])));
+    await open();
+
+    page.querySelector<HTMLButtonElement>(`[data-export="${format}"]`)?.click();
+    harness.detectChanges();
+
+    expect(downloadReport).toHaveBeenCalledWith('scan-1', format);
+    expect(save).toHaveBeenCalledWith(file, `vulnscan-report-scan-1.${format}`);
+    // Ready for another download.
+    expect(page.querySelector<HTMLButtonElement>(`[data-export="${format}"]`)?.disabled).toBe(
+      false,
+    );
+  });
+
+  it('shows a download in progress and blocks a second one meanwhile', async () => {
+    downloadReport.mockReturnValue(new Subject<Blob>());
+    getReport.mockReturnValue(of(makeReport()));
+    await open();
+
+    page.querySelector<HTMLButtonElement>('[data-export="pdf"]')?.click();
+    harness.detectChanges();
+    page.querySelector<HTMLButtonElement>('[data-export="json"]')?.click();
+
+    expect(downloadReport).toHaveBeenCalledTimes(1);
+    expect(text('[data-export="pdf"]')).toBe('Preparing…');
+    expect(page.querySelector<HTMLButtonElement>('[data-export="json"]')?.disabled).toBe(true);
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it('explains why a download failed', async () => {
+    downloadReport.mockReturnValue(
+      throwError(
+        () =>
+          new HttpErrorResponse({
+            status: 503,
+            error: {
+              error: {
+                code: 'ReportFormatUnavailable',
+                message: 'PDF export is not available on this installation.',
+              },
+            },
+          }),
+      ),
+    );
+    getReport.mockReturnValue(of(makeReport()));
+    await open();
+
+    page.querySelector<HTMLButtonElement>('[data-export="pdf"]')?.click();
+    harness.detectChanges();
+
+    expect(text('.alert-error')).toBe('PDF export is not available on this installation.');
+    expect(save).not.toHaveBeenCalled();
+    expect(page.querySelector<HTMLButtonElement>('[data-export="pdf"]')?.disabled).toBe(false);
+  });
+
+  it('does not offer a download while the scan is still running', async () => {
+    TestBed.overrideProvider(POLL_INTERVAL, { useValue: 60_000 });
+    getReport.mockReturnValue(
+      of(makeReport(makeScan({ status: 'RUNNING', progress_percent: 10 }))),
+    );
+
+    await open();
+
+    expect(page.querySelector<HTMLButtonElement>('[data-export="json"]')?.disabled).toBe(true);
+    expect(page.querySelector<HTMLButtonElement>('[data-export="pdf"]')?.disabled).toBe(true);
   });
 
   it('deletes the scan after confirmation and returns to the list', async () => {

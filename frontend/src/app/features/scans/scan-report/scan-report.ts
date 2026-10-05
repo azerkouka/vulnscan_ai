@@ -6,9 +6,11 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { EMPTY, catchError, map, switchMap, tap } from 'rxjs';
 
 import { describeHttpError } from '../../../core/api/api-error';
+import { FileSaver } from '../../../core/api/file-saver';
 import { POLL_INTERVAL, pollWhile } from '../../../core/scans/poll';
 import { ScanService } from '../../../core/scans/scan-service';
 import {
+  ReportFormat,
   SEVERITIES,
   ScanReport,
   Severity,
@@ -36,6 +38,7 @@ type SeverityFilter = Severity | 'ALL';
 export class ScanReportPage {
   private readonly scans = inject(ScanService);
   private readonly router = inject(Router);
+  private readonly fileSaver = inject(FileSaver);
   private readonly pollInterval = inject(POLL_INTERVAL);
 
   protected readonly severities = SEVERITIES;
@@ -46,6 +49,8 @@ export class ScanReportPage {
   protected readonly loadError = signal<string | null>(null);
   protected readonly actionError = signal<string | null>(null);
   protected readonly deleting = signal(false);
+  /** The format being downloaded right now, if any. */
+  protected readonly exporting = signal<ReportFormat | null>(null);
   protected readonly filter = signal<SeverityFilter>('ALL');
 
   protected readonly inProgress = computed(() => {
@@ -97,6 +102,25 @@ export class ScanReportPage {
         this.loadError.set(null);
         this.report.set(report);
       });
+  }
+
+  protected download(format: ReportFormat): void {
+    const report = this.report();
+    if (report === null || this.exporting() !== null) {
+      return;
+    }
+    this.exporting.set(format);
+    this.actionError.set(null);
+    this.scans.downloadReport(report.scan.id, format).subscribe({
+      next: (file) => {
+        this.fileSaver.save(file, `vulnscan-report-${report.scan.id}.${format}`);
+        this.exporting.set(null);
+      },
+      error: (error: unknown) => {
+        this.exporting.set(null);
+        this.actionError.set(describeHttpError(error, 'The report could not be downloaded.'));
+      },
+    });
   }
 
   protected remove(): void {

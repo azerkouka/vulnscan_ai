@@ -131,10 +131,7 @@ class RunScanAnalysisUseCase:
 
             for chunk_index, chunk in enumerate(chunks, start=1):
                 total_chunks += 1
-                context = await self._retriever.query(
-                    chunk.content[: self._settings.retrieval_query_max_chars],
-                    top_k=self._settings.retrieval_top_k,
-                )
+                context = await self._retrieve(chunk)
 
                 findings: list[Finding] = []
                 try:
@@ -192,6 +189,22 @@ class RunScanAnalysisUseCase:
             ),
             completed_at=datetime.now(UTC),
         )
+
+    async def _retrieve(self, chunk: CodeChunk) -> list[RetrievedKnowledge]:
+        try:
+            return await self._retriever.query(
+                chunk.content[: self._settings.retrieval_query_max_chars],
+                top_k=self._settings.retrieval_top_k,
+            )
+        except Exception as exc:
+            # Unlike a bad LLM reply, this is not about one chunk: the vector
+            # store is down or unreachable, and every further chunk would
+            # fail the same way. Stop, and say what is wrong.
+            logger.exception("knowledge_retrieval_failed scan_chunk=%s", chunk.location.file_path)
+            raise _AnalysisAbortedError(
+                "The knowledge base could not be queried; check that ChromaDB is running, "
+                "then run the scan again."
+            ) from exc
 
     async def _to_finding(
         self,

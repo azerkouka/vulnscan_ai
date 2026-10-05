@@ -38,9 +38,40 @@ flowchart LR
     INFRA --> OLLAMA
 ```
 
-Full architecture proposal (folder tree, ERD, API endpoint list, `Finding`
-schema) is captured in the Phase 0 discussion; this README is filled in
-further in Phase 7 with the final diagrams and demo instructions.
+How one scan flows through it:
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant FE as Angular SPA
+    participant API as FastAPI
+    participant Job as Scan job (in-process)
+    participant KB as ChromaDB
+    participant LLM as Ollama
+    participant DB as PostgreSQL
+
+    User->>FE: paste code / upload file or zip
+    FE->>API: POST /scans (multipart)
+    API->>DB: scan = PENDING
+    API-->>FE: 202 Accepted
+    API-)Job: enqueue
+    loop every chunk of every file
+        Job->>KB: retrieve OWASP / CWE / ATT&CK excerpts
+        Job->>LLM: code chunk + excerpts
+        LLM-->>Job: findings (JSON)
+        Job->>DB: validated findings, progress
+    end
+    Job->>DB: scan = COMPLETED
+    loop until finished
+        FE->>API: GET /scans/{id}/report
+    end
+    FE-->>User: report (also as JSON / PDF)
+```
+
+Data model: `users` own `scans`; a scan has `scan_files` (metadata - the
+source text itself is kept on disk, under generated names) and `findings`;
+a finding has `finding_references` to the knowledge base entries it cites.
+`knowledge_documents` mirrors what is indexed in ChromaDB.
 
 ## Repository layout
 
@@ -70,11 +101,43 @@ docker compose up --build
 - ChromaDB: http://localhost:8001
 - Ollama: http://localhost:11434
 
-Pull the model Ollama will use once the `ollama` service is up:
+On the first run, three one-off steps are needed once the services are up:
 
 ```bash
+# 1. Create the database tables
+docker compose exec backend alembic upgrade head
+# 2. Load the OWASP / CWE / ATT&CK knowledge base (downloads an ~80 MB embedding model)
+docker compose exec backend python -m scripts.ingest_knowledge
+# 3. Pull the model Ollama will use (~5 GB)
 docker compose exec ollama ollama pull llama3
 ```
+
+Then open http://localhost:4200, create an account and start a scan. Run
+step 1 again after pulling a version that adds a migration.
+
+If PostgreSQL is already installed on your machine, its port 5432 collides
+with the container's: set `POSTGRES_HOST_PORT=5433` in `.env`.
+
+## Trying it without a model
+
+A real scan needs Ollama and the `llama3` model (about 5 GB; without a GPU a
+scan can take several minutes). To see the app with data before that, record
+a finished demo scan of the bundled sample project:
+
+```bash
+docker compose exec backend alembic upgrade head            # once
+docker compose exec backend python -m scripts.ingest_knowledge   # once
+docker compose exec backend python -m scripts.seed_demo
+```
+
+It creates the account `demo@example.com`, prints its generated password
+once, and adds a completed scan with hand-written findings (each is labelled
+as demo data). Sign in at http://localhost:4200 to browse the dashboard, the
+report and its JSON / PDF exports.
+
+The sample it uses lives in `backend/data/samples/vulnerable-app` - a few
+files written to be insecure. Zip that folder and upload it on the *New
+scan* page to run a real scan of the same code. Never run or deploy it.
 
 ## Local development (without Docker)
 
@@ -90,8 +153,8 @@ uvicorn app.main:app --reload
 
 `.[dev]` is enough to run the unit tests. Knowledge ingestion and real scans
 need the `rag` extra (`.[dev,rag]`), function-level code chunking needs
-`chunking` (without it files are cut into plain line windows), and Phase 7
-adds `export`. On
+`chunking` (without it files are cut into plain line windows), and PDF
+export needs `export`. On
 Windows, `rag` and `chunking` pull in packages with native extensions
 (`chroma-hnswlib`, `tree-sitter-language-pack`) that need the
 [Microsoft C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
@@ -186,6 +249,7 @@ Any authenticated user can submit code and read back their own scans:
 | `GET /api/v1/scans/{id}` | Status and progress - poll this until `COMPLETED` or `FAILED`. |
 | `GET /api/v1/scans/{id}/report` | Findings (most severe first), per-severity counts and the scanned files. |
 | `DELETE /api/v1/scans/{id}` | Delete a finished scan, its findings and its stored source. |
+| `GET /api/v1/scans/{id}/export?format=json\|pdf` | Download a finished scan's report as a file. |
 | `GET /api/v1/dashboard/summary` | Your totals: scans by status, findings by severity, most frequent CWEs, latest scans. |
 
 ```bash
@@ -220,6 +284,63 @@ this assumes a single backend process, as in `docker-compose.yml`.
 
 Ingest the knowledge base before scanning: without it scans still run, but
 findings carry no CWE / OWASP / ATT&CK classification.
+
+## Report export
+
+A finished scan's report can be downloaded from its page, or from the API:
+
+- **JSON** - the whole report as structured data (`schema_version: 1`), for
+  scripts and other tools.
+- **PDF** - a printable report, laid out by WeasyPrint.
+
+Report content is text a language model wrote about code a user submitted,
+so the PDF generator treats it as hostile: every value is HTML-escaped, and
+the renderer is given a fetcher that refuses every URL, so nothing in a
+report can make the server request a resource. PDF export needs the Pango
+system library (included in the Docker image); where it is missing the
+endpoint answers 503 and JSON export keeps working.
+
+## Security
+
+What the platform does to protect itself and its users:
+
+| Area | Measures |
+| --- | --- |
+| Submitted code | Analyzed as text only - never imported or executed. Stored under generated ids; no client-supplied name is ever a filesystem path. |
+| Archives | Zip slip and zip bombs rejected: path traversal entries, entry count, uncompressed size and compression ratio are checked on the bytes actually decompressed. |
+| LLM output | Schema-validated; CWE / OWASP / ATT&CK ids kept only if they exist in the knowledge base; line numbers forced inside the reviewed code; rendered as plain text in the UI and escaped in PDFs. |
+| Prompt injection | Code is fenced with a per-call random boundary and declared as data; the real defense is the validation above, which holds whatever the model was talked into. |
+| Authentication | Argon2 password hashes; short-lived JWT access tokens; rotating single-use refresh tokens, with reuse treated as theft (all sessions revoked). Login does the same hashing work whether or not the account exists. |
+| Authorization | Every scan, report, export and statistic is scoped to its owner; another user's scan answers 404, like a missing one. |
+| Abuse | Rate limits on login, registration and scan submission; a cap on unfinished scans per user; request bodies over the upload limit refused before they are read. |
+| HTTP | Security headers on every response (`nosniff`, no framing, no caching of API data, a deny-all content policy for the API and a strict one for the SPA); CORS limited to the configured origins, methods and headers. |
+| Errors | One error envelope everywhere; validation errors never echo the rejected input; unexpected errors are logged, not returned. Secrets are redacted from logs. |
+
+Known limits, by design of this version:
+
+- Scan jobs run inside the backend process: run a single backend instance,
+  and expect scans in progress to be marked failed if it restarts.
+- Rate limits are counted per backend process, in memory.
+- The refresh token is kept in the browser's `sessionStorage`, readable by
+  any script running in the page; the strict content policy is what keeps
+  such a script from running.
+- Findings come from a language model: it misses vulnerabilities and it
+  reports some that are not real. A report is a starting point for review,
+  not a verdict.
+
+### Production checklist
+
+- Set `ENVIRONMENT=production`. The backend then refuses to start with
+  `DEBUG=true`, a weak or placeholder `JWT_SECRET_KEY`, or a wildcard CORS
+  origin; it turns the interactive API docs off and sends HSTS.
+- Generate the secret: `python -c "import secrets; print(secrets.token_urlsafe(64))"`.
+- Choose a real `POSTGRES_PASSWORD`, and do not publish the database,
+  ChromaDB or Ollama ports outside the Docker network.
+- Serve everything over HTTPS, behind a TLS-terminating proxy. Build the
+  frontend with the `production` target of `frontend/Dockerfile`; it serves
+  the bundle with nginx and proxies `/api/` to the backend.
+- Set `CORS_ORIGINS` to the frontend's real origin (not needed when the API
+  is only reached through that same-origin proxy).
 
 ## Frontend
 
@@ -278,4 +399,4 @@ Built phase by phase; each phase is reviewed before the next starts.
 - [x] Phase 4 — Code chunking + LLM analysis pipeline + scan use cases + async jobs + tests
 - [x] Phase 5 — Angular core (auth, interceptors, guards, layout)
 - [x] Phase 6 — Angular features (new scan, scan list, report view, dashboard)
-- [ ] Phase 7 — Report export, error handling polish, security hardening, README, demo data
+- [x] Phase 7 — Report export, error handling polish, security hardening, README, demo data

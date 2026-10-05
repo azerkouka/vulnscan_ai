@@ -1,4 +1,4 @@
-import { provideHttpClient } from '@angular/common/http';
+import { HttpErrorResponse, provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 
@@ -91,6 +91,50 @@ describe('ScanService', () => {
 
     scans.dashboardSummary().subscribe();
     http.expectOne(`${TEST_API_URL}/dashboard/summary`).flush(makeSummary());
+  });
+
+  it('downloads a report as a file in the requested format', () => {
+    const pdf = new Blob(['%PDF-1.7'], { type: 'application/pdf' });
+    let received: Blob | undefined;
+
+    scans.downloadReport('abc', 'pdf').subscribe((file) => (received = file));
+
+    const request = http.expectOne((r) => r.url === `${TEST_API_URL}/scans/abc/export`);
+    expect(request.request.params.get('format')).toBe('pdf');
+    expect(request.request.responseType).toBe('blob');
+    request.flush(pdf);
+    expect(received).toBe(pdf);
+  });
+
+  it('gives a failed download the same readable error body as any other request', async () => {
+    const failure = new Promise<unknown>((resolve) => {
+      scans.downloadReport('abc', 'pdf').subscribe({ error: resolve });
+    });
+
+    // With responseType "blob", even the JSON error body arrives as a Blob.
+    const body = new Blob(
+      [
+        JSON.stringify({
+          error: {
+            code: 'ReportFormatUnavailable',
+            message: 'PDF export is not available on this installation.',
+          },
+        }),
+      ],
+      { type: 'application/json' },
+    );
+    http
+      .expectOne((r) => r.url === `${TEST_API_URL}/scans/abc/export`)
+      .flush(body, { status: 503, statusText: 'Service Unavailable' });
+
+    const error = (await failure) as HttpErrorResponse;
+    expect(error.status).toBe(503);
+    expect(error.error).toEqual({
+      error: {
+        code: 'ReportFormatUnavailable',
+        message: 'PDF export is not available on this installation.',
+      },
+    });
   });
 
   it('keeps a scan id from altering the request path', () => {

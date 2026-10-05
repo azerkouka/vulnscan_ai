@@ -24,6 +24,7 @@ os.environ.setdefault(
 # A tight auth rate limit is a production feature, not something we want
 # tripping unrelated tests that log in more than a handful of times.
 os.environ.setdefault("AUTH_RATE_LIMIT", "1000/minute")
+os.environ.setdefault("SCAN_RATE_LIMIT", "1000/minute")
 
 import pytest
 import pytest_asyncio

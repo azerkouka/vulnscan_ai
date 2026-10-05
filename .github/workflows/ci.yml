@@ -27,9 +27,7 @@ jobs:
           cache-dependency-path: backend/pyproject.toml
       - name: Install backend + dev dependencies
         working-directory: backend
-        # Extend to ".[dev,rag,chunking,export]" from Phase 7 onward, once
-        # the export group starts being used.
-        run: pip install -e ".[dev,rag,chunking]"
+        run: pip install -e ".[dev,rag,chunking,export]"
       - name: ruff
         working-directory: backend
         run: ruff check .
@@ -72,9 +70,11 @@ jobs:
           python-version: "3.12"
           cache: pip
           cache-dependency-path: backend/pyproject.toml
+      - name: Install Pango (needed by WeasyPrint for the PDF export tests)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libpango-1.0-0 libpangoft2-1.0-0
       - name: Install backend + dev dependencies
         working-directory: backend
-        run: pip install -e ".[dev,rag,chunking]"
+        run: pip install -e ".[dev,rag,chunking,export]"
       - name: Wait for ChromaDB
         # No --health-cmd on the service above: it'd run via `docker exec`
         # inside the chromadb image, which may not have curl. Polling from

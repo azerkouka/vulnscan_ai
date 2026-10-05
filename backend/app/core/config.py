@@ -8,9 +8,9 @@ the cache and monkeypatching environment variables.
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Self
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
@@ -90,8 +90,10 @@ class Settings(BaseSettings):
         ]
     )
 
-    # --- Rate limiting ---
+    # --- Rate limiting / abuse protection ---
     auth_rate_limit: str = "5/minute"
+    scan_rate_limit: str = "20/minute"
+    max_active_scans_per_user: int = 3
 
     @field_validator("cors_origins", "allowed_upload_extensions", mode="before")
     @classmethod
@@ -100,6 +102,34 @@ class Settings(BaseSettings):
         if isinstance(value, str):
             return [item.strip() for item in value.split(",") if item.strip()]
         return value
+
+    @model_validator(mode="after")
+    def _refuse_unsafe_production_settings(self) -> Self:
+        """Fail at startup rather than run in production with a setting that
+        defeats the security of the whole API."""
+        if self.environment != "production":
+            return self
+        secret = self.jwt_secret_key
+        if len(secret) < _MIN_PRODUCTION_SECRET_LENGTH or secret in _PLACEHOLDER_SECRETS:
+            raise ValueError(
+                "JWT_SECRET_KEY must be a random value of at least "
+                f"{_MIN_PRODUCTION_SECRET_LENGTH} characters in production "
+                '(generate one with: python -c "import secrets; print(secrets.token_urlsafe(64))").'
+            )
+        if self.debug:
+            raise ValueError("DEBUG must be false in production.")
+        if "*" in self.cors_origins:
+            raise ValueError("CORS_ORIGINS must list explicit origins in production, not '*'.")
+        return self
+
+    @property
+    def max_request_body_bytes(self) -> int:
+        """The upload limit plus room for the multipart framing around it."""
+        return (self.upload_max_size_mb + 1) * 1024 * 1024
+
+
+_MIN_PRODUCTION_SECRET_LENGTH = 32
+_PLACEHOLDER_SECRETS = frozenset({"change-this-to-a-random-64-byte-secret"})
 
 
 @lru_cache

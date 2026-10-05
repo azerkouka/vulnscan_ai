@@ -19,15 +19,42 @@
         {{ totalLines() === 1 ? 'line' : 'lines' }}
       </p>
     </div>
-    <button
-      class="btn btn-ghost btn-danger"
-      type="button"
-      [disabled]="inProgress() || deleting()"
-      [attr.title]="inProgress() ? 'A scan can be deleted once it has finished' : null"
-      (click)="remove()"
-    >
-      Delete scan
-    </button>
+    <div class="report-actions">
+      <button
+        class="btn btn-ghost"
+        type="button"
+        data-export="json"
+        [disabled]="inProgress() || exporting() !== null"
+        [attr.title]="
+          inProgress() ? 'The report can be downloaded once the scan has finished' : null
+        "
+        (click)="download('json')"
+      >
+        {{ exporting() === 'json' ? 'Preparing…' : 'Download JSON' }}
+      </button>
+      <button
+        class="btn btn-ghost"
+        type="button"
+        data-export="pdf"
+        [disabled]="inProgress() || exporting() !== null"
+        [attr.title]="
+          inProgress() ? 'The report can be downloaded once the scan has finished' : null
+        "
+        (click)="download('pdf')"
+      >
+        {{ exporting() === 'pdf' ? 'Preparing…' : 'Download PDF' }}
+      </button>
+      <button
+        class="btn btn-ghost btn-danger"
+        type="button"
+        data-action="delete"
+        [disabled]="inProgress() || deleting()"
+        [attr.title]="inProgress() ? 'A scan can be deleted once it has finished' : null"
+        (click)="remove()"
+      >
+        Delete scan
+      </button>
+    </div>
   </header>
 
   @if (actionError(); as message) {

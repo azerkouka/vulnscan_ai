@@ -36,10 +36,18 @@ describe('describeHttpError', () => {
     expect(describeHttpError(httpError(0, null))).toContain('Cannot reach the server');
   });
 
-  it('replaces the rate limiter technical message with a readable one', () => {
+  it('shows the reason the backend gives for a 429', () => {
+    const error = httpError(429, {
+      error: { code: 'TooManyActiveScans', message: 'You already have 3 scans in progress.' },
+    });
+
+    expect(describeHttpError(error)).toBe('You already have 3 scans in progress.');
+  });
+
+  it('has its own message for a 429 that carries none', () => {
     const error = httpError(429, { error: 'Rate limit exceeded: 5 per 1 minute' });
 
-    expect(describeHttpError(error)).toBe('Too many attempts. Please wait a minute and try again.');
+    expect(describeHttpError(error)).toBe('Too many requests. Please wait a moment and try again.');
   });
 
   it.each([

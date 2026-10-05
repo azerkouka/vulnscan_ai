@@ -5,11 +5,14 @@ const DEFAULT_MESSAGE = 'Something went wrong. Please try again.';
 /**
  * A message fit to show the user for a failed API call.
  *
- * The backend answers errors in one of three shapes, depending on which
- * layer rejected the request:
- * - its own envelope: `{ "error": { "code": "...", "message": "..." } }`
- * - FastAPI request validation: `{ "detail": [{ "msg": "...", ... }] }`
- * - the rate limiter: HTTP 429 with a technical, non user-facing message
+ * The backend answers every error with one envelope,
+ * `{ "error": { "code": "...", "message": "..." } }`. FastAPI's native
+ * `{ "detail": ... }` shape is still understood, in case a response ever
+ * comes from a layer that bypasses the backend's own handlers.
+ *
+ * When the body carries no usable message, a few statuses still get a
+ * specific one (unreachable server, too many requests) rather than the
+ * caller's generic fallback.
  */
 export function describeHttpError(error: unknown, fallback = DEFAULT_MESSAGE): string {
   if (!(error instanceof HttpErrorResponse)) {
@@ -17,9 +20,6 @@ export function describeHttpError(error: unknown, fallback = DEFAULT_MESSAGE): s
   }
   if (error.status === 0) {
     return 'Cannot reach the server. Check your connection and try again.';
-  }
-  if (error.status === 429) {
-    return 'Too many attempts. Please wait a minute and try again.';
   }
 
   const body: unknown = error.error;
@@ -43,6 +43,9 @@ export function describeHttpError(error: unknown, fallback = DEFAULT_MESSAGE): s
     }
   }
 
+  if (error.status === 429) {
+    return 'Too many requests. Please wait a moment and try again.';
+  }
   return fallback;
 }
 

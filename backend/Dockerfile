@@ -43,6 +43,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
+# Bake ChromaDB's embedding model (all-MiniLM-L6-v2, ~80 MB) into the image.
+# The library otherwise downloads it on first use, into the container's own
+# filesystem: every new container would fetch it again during its first scan,
+# and that scan fails if the download is slow or the host is offline. Done
+# here it is fetched once, at build time, where a failure is visible and the
+# layer is cached (it sits before the application code on purpose).
+USER appuser
+RUN set -e; \
+    for attempt in 1 2 3 4 5; do \
+        python -c "from chromadb.utils.embedding_functions import DefaultEmbeddingFunction; DefaultEmbeddingFunction()(['warm up'])" \
+            && break; \
+        echo "embedding model download failed (attempt $attempt of 5)"; sleep 5; \
+    done; \
+    test -f /home/appuser/.cache/chroma/onnx_models/all-MiniLM-L6-v2/onnx/model.onnx; \
+    rm -f /home/appuser/.cache/chroma/onnx_models/all-MiniLM-L6-v2/onnx.tar.gz
+USER root
+
 WORKDIR /app
 COPY --chown=appuser:appuser . .
 # Submitted source is stored here (UPLOAD_DIR). Created and owned up front

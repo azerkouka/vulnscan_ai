@@ -61,3 +61,12 @@ class InvalidArchiveError(DomainError):
 class LLMAnalysisError(DomainError):
     """Raised when the LLM could not produce a valid analysis for a chunk,
     even after retries."""
+
+
+class TooManyActiveScansError(DomainError):
+    """Raised when a user already has as many unfinished scans as allowed."""
+
+
+class ReportFormatUnavailableError(DomainError):
+    """Raised when a report can't be exported to the requested format on
+    this installation (e.g. the PDF libraries are not installed)."""

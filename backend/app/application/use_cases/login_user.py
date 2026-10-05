@@ -9,6 +9,13 @@ from app.domain.ports.password_hasher import PasswordHasher
 from app.domain.ports.token_service import TokenService
 from app.domain.ports.unit_of_work import UnitOfWork
 
+# Verified against when no account matches the email, so that a login attempt
+# costs the same password-hash computation whether or not the account exists.
+# Without it, "unknown email" answers measurably faster than "wrong password",
+# which lets anyone test which emails are registered.
+_DECOY_PASSWORD = "decoy-password-for-constant-time-login"  # noqa: S105 - not a credential
+_decoy_hashes: dict[type[PasswordHasher], str] = {}
+
 
 class LoginUserUseCase:
     def __init__(
@@ -28,7 +35,9 @@ class LoginUserUseCase:
 
         async with self._uow:
             user = await self._uow.users.get_by_email(email)
-            if user is None or not self._hasher.verify(data.password, user.hashed_password):
+            hashed_password = user.hashed_password if user else self._decoy_hash()
+            password_matches = self._hasher.verify(data.password, hashed_password)
+            if user is None or not password_matches:
                 raise InvalidCredentialsError("Invalid email or password.")
             if not user.is_active:
                 raise InactiveUserError("This account has been deactivated.")
@@ -39,3 +48,11 @@ class LoginUserUseCase:
             await self._uow.commit()
 
         return token_pair
+
+    def _decoy_hash(self) -> str:
+        """A real hash from this hasher (so verifying against it does the
+        full work), computed once per hasher type."""
+        hasher_type = type(self._hasher)
+        if hasher_type not in _decoy_hashes:
+            _decoy_hashes[hasher_type] = self._hasher.hash(_DECOY_PASSWORD)
+        return _decoy_hashes[hasher_type]

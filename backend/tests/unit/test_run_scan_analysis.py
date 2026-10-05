@@ -354,3 +354,27 @@ async def test_unknown_scan_id_is_a_no_op() -> None:
     await harness.use_case.execute(make_scan().id)
 
     assert harness.analyzer.calls == []
+
+
+@pytest.mark.unit
+async def test_scan_fails_with_a_clear_message_when_the_knowledge_base_is_down() -> None:
+    harness = await _harness(
+        files={"a.py": "x = 1\ny = 2\n"},
+        lines_per_chunk=1,
+        default=[make_analyzed_finding()],
+    )
+
+    async def _unreachable(*_args: object, **_kwargs: object) -> list[object]:
+        raise ConnectionError("chromadb:8000 refused the connection")
+
+    harness.use_case._retriever.query = _unreachable  # type: ignore[method-assign]
+
+    scan = await harness.run()
+
+    assert scan.status is ScanStatus.FAILED
+    assert scan.error_message is not None
+    assert "knowledge base could not be queried" in scan.error_message
+    # Internal details stay in the logs, not in what the user is shown.
+    assert "chromadb:8000" not in scan.error_message
+    # No point asking the model anything, nor trying the second chunk.
+    assert harness.analyzer.calls == []

@@ -11,7 +11,9 @@ from app.domain.value_objects.source_type import SourceType
 from tests.unit.fakes import FakeArchiveExtractor, FakeJobRunner, FakeSourceStorage, FakeUnitOfWork
 
 _LIMITS = ScanSourceLimits(
-    max_upload_bytes=1024, allowed_extensions=frozenset({".py", ".js", ".zip"})
+    max_upload_bytes=1024,
+    allowed_extensions=frozenset({".py", ".js", ".zip"}),
+    max_active_scans=2,
 )
 
 

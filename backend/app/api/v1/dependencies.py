@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.application.use_cases.create_scan import CreateScanUseCase, ScanSourceLimits
 from app.application.use_cases.delete_scan import DeleteScanUseCase
+from app.application.use_cases.export_scan_report import ExportScanReportUseCase
 from app.application.use_cases.fail_scans import FailScanUseCase
 from app.application.use_cases.get_current_user import GetCurrentUserUseCase
 from app.application.use_cases.get_dashboard_summary import GetDashboardSummaryUseCase
@@ -45,10 +46,14 @@ from app.domain.ports.job_runner import JobRunner
 from app.domain.ports.knowledge_indexer import KnowledgeIndexer
 from app.domain.ports.llm_analyzer import LLMAnalyzer
 from app.domain.ports.password_hasher import PasswordHasher
+from app.domain.ports.report_exporter import ReportExporter
 from app.domain.ports.source_storage import SourceStorage
 from app.domain.ports.token_service import TokenService
 from app.domain.ports.unit_of_work import UnitOfWork
+from app.domain.value_objects.report_format import ReportFormat
 from app.infrastructure.code_analysis.tree_sitter_chunker import TreeSitterChunker
+from app.infrastructure.export.json_exporter import JsonReportExporter
+from app.infrastructure.export.pdf_exporter import PdfReportExporter
 from app.infrastructure.llm.ollama_analyzer import create_ollama_analyzer
 from app.infrastructure.persistence.unit_of_work import SqlAlchemyUnitOfWork
 from app.infrastructure.security.password_hasher import Argon2PasswordHasher
@@ -280,6 +285,7 @@ def get_create_scan_use_case(
     limits = ScanSourceLimits(
         max_upload_bytes=settings.upload_max_size_mb * _MEBIBYTE,
         allowed_extensions=_allowed_extensions(settings),
+        max_active_scans=settings.max_active_scans_per_user,
     )
     return CreateScanUseCase(uow, storage, extractor, job_runner, limits)
 
@@ -309,3 +315,15 @@ def get_dashboard_summary_use_case(
     uow: UnitOfWork = Depends(get_unit_of_work),
 ) -> GetDashboardSummaryUseCase:
     return GetDashboardSummaryUseCase(uow)
+
+
+@lru_cache
+def get_report_exporters() -> dict[ReportFormat, ReportExporter]:
+    return {ReportFormat.JSON: JsonReportExporter(), ReportFormat.PDF: PdfReportExporter()}
+
+
+def get_export_scan_report_use_case(
+    uow: UnitOfWork = Depends(get_unit_of_work),
+    exporters: dict[ReportFormat, ReportExporter] = Depends(get_report_exporters),
+) -> ExportScanReportUseCase:
+    return ExportScanReportUseCase(uow, exporters)

@@ -12,6 +12,12 @@ h1 {
   color: var(--color-muted);
 }
 
+.report-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
 .progress-card {
   display: flex;
   flex-direction: column;

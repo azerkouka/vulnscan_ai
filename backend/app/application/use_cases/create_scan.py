@@ -17,7 +17,11 @@ from uuid import uuid4
 
 from app.application.dto.scan import CreateScanInput, ScanSummary
 from app.domain.entities.scan import Scan, ScanFile
-from app.domain.exceptions import InvalidSourceError, SourceTooLargeError
+from app.domain.exceptions import (
+    InvalidSourceError,
+    SourceTooLargeError,
+    TooManyActiveScansError,
+)
 from app.domain.ports.archive_extractor import ArchiveExtractor, ExtractedFile
 from app.domain.ports.job_runner import JobRunner
 from app.domain.ports.source_storage import SourceStorage
@@ -40,6 +44,10 @@ class ScanSourceLimits:
     max_upload_bytes: int
     allowed_extensions: frozenset[str]
     """Lower-case, dot-prefixed (".py"); includes ".zip" if archives are accepted."""
+    max_active_scans: int
+    """How many unfinished (queued or running) scans one user may have. Scans
+    are analyzed one after another by a single local model, so without a cap
+    one account could fill the queue and starve everyone else."""
 
 
 class CreateScanUseCase:
@@ -61,6 +69,15 @@ class CreateScanUseCase:
         if len(data.content) > self._limits.max_upload_bytes:
             limit_mb = self._limits.max_upload_bytes / (1024 * 1024)
             raise SourceTooLargeError(f"Submitted source exceeds the {limit_mb:g} MB limit.")
+
+        async with self._uow:
+            by_status = await self._uow.scans.count_by_status_for_user(data.user_id)
+        active = by_status.get(ScanStatus.PENDING, 0) + by_status.get(ScanStatus.RUNNING, 0)
+        if active >= self._limits.max_active_scans:
+            raise TooManyActiveScansError(
+                f"You already have {active} scans in progress; "
+                "wait for one to finish before starting another."
+            )
 
         source_type, resolved = await self._resolve_sources(data)
         sources = [

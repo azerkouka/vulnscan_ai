@@ -1,9 +1,16 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable } from 'rxjs';
+import { Observable, catchError, from, switchMap, throwError } from 'rxjs';
 
 import { API_BASE_URL } from '../config/api-base-url';
-import { DashboardSummary, Scan, ScanList, ScanReport, ScanSubmission } from './scan.models';
+import {
+  DashboardSummary,
+  ReportFormat,
+  Scan,
+  ScanList,
+  ScanReport,
+  ScanSubmission,
+} from './scan.models';
 
 /** Thin client for the `/scans` and `/dashboard` endpoints - no state of its own. */
 @Injectable({ providedIn: 'root' })
@@ -35,11 +42,49 @@ export class ScanService {
     return this.http.get<ScanReport>(`${this.baseUrl}/scans/${encodeURIComponent(scanId)}/report`);
   }
 
+  /** The report of a finished scan, as a file. */
+  downloadReport(scanId: string, format: ReportFormat): Observable<Blob> {
+    return this.http
+      .get(`${this.baseUrl}/scans/${encodeURIComponent(scanId)}/export`, {
+        params: { format },
+        responseType: 'blob',
+      })
+      .pipe(
+        catchError((error: unknown) =>
+          from(withParsedBody(error)).pipe(switchMap((parsed) => throwError(() => parsed))),
+        ),
+      );
+  }
+
   delete(scanId: string): Observable<void> {
     return this.http.delete<void>(`${this.baseUrl}/scans/${encodeURIComponent(scanId)}`);
   }
 
   dashboardSummary(): Observable<DashboardSummary> {
     return this.http.get<DashboardSummary>(`${this.baseUrl}/dashboard/summary`);
+  }
+}
+
+/**
+ * A request made with `responseType: 'blob'` gets its *error* body as a Blob
+ * too, even though the backend answered JSON. This turns it back into the
+ * parsed JSON every other failed request carries, so the backend's message
+ * can be shown as usual.
+ */
+async function withParsedBody(error: unknown): Promise<unknown> {
+  if (!(error instanceof HttpErrorResponse) || !(error.error instanceof Blob)) {
+    return error;
+  }
+  try {
+    const body: unknown = JSON.parse(await error.error.text());
+    return new HttpErrorResponse({
+      error: body,
+      headers: error.headers,
+      status: error.status,
+      statusText: error.statusText,
+      url: error.url ?? undefined,
+    });
+  } catch {
+    return error; // not JSON after all: keep the original
   }
 }

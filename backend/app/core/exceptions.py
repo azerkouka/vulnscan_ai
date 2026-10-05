@@ -11,7 +11,9 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import FastAPI, Request, status
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from slowapi.errors import RateLimitExceeded
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.core.logging import get_logger
@@ -24,9 +26,11 @@ from app.domain.exceptions import (
     InvalidRefreshTokenError,
     InvalidSourceError,
     KnowledgeDocumentNotFoundError,
+    ReportFormatUnavailableError,
     ScanInProgressError,
     ScanNotFoundError,
     SourceTooLargeError,
+    TooManyActiveScansError,
     UserNotFoundError,
 )
 
@@ -44,6 +48,8 @@ _DOMAIN_ERROR_STATUS: dict[type[DomainError], int] = {
     InvalidSourceError: status.HTTP_422_UNPROCESSABLE_ENTITY,
     InvalidArchiveError: status.HTTP_422_UNPROCESSABLE_ENTITY,
     SourceTooLargeError: status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+    TooManyActiveScansError: status.HTTP_429_TOO_MANY_REQUESTS,
+    ReportFormatUnavailableError: status.HTTP_503_SERVICE_UNAVAILABLE,
 }
 
 
@@ -108,6 +114,46 @@ def register_exception_handlers(app: FastAPI) -> None:
         error_code = type(exc).__name__.removesuffix("Error")
         logger.info("domain_error", error_code=error_code, message=str(exc))
         return _error_response(status_code, error_code, str(exc))
+
+    @app.exception_handler(RequestValidationError)
+    async def handle_validation_error(
+        _request: Request, exc: RequestValidationError
+    ) -> JSONResponse:
+        # Same envelope as every other error, instead of FastAPI's own
+        # `{"detail": [...]}` shape. Only the location and message of each
+        # problem are returned - never the rejected input itself, which may
+        # be a password.
+        details = [
+            {
+                "field": ".".join(str(part) for part in error["loc"] if part != "body"),
+                "message": str(error["msg"]),
+            }
+            for error in exc.errors()
+        ]
+        summary = "; ".join(
+            f"{detail['field']}: {detail['message']}" if detail["field"] else detail["message"]
+            for detail in details
+        )
+        return JSONResponse(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            content={
+                "error": {
+                    "code": "validation_error",
+                    "message": summary or "The request is invalid.",
+                    "details": details,
+                }
+            },
+        )
+
+    @app.exception_handler(RateLimitExceeded)
+    async def handle_rate_limit(_request: Request, _exc: RateLimitExceeded) -> JSONResponse:
+        response = _error_response(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            "rate_limited",
+            "Too many requests. Please wait a moment and try again.",
+        )
+        response.headers["Retry-After"] = "60"
+        return response
 
     @app.exception_handler(StarletteHTTPException)
     async def handle_http_exception(_request: Request, exc: StarletteHTTPException) -> JSONResponse:

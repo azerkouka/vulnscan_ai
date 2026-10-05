@@ -1,11 +1,12 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, Query, Request, Response, UploadFile, status
 
 from app.api.v1.dependencies import (
     get_create_scan_use_case,
     get_current_user,
     get_delete_scan_use_case,
+    get_export_scan_report_use_case,
     get_get_scan_report_use_case,
     get_get_scan_use_case,
     get_list_scans_use_case,
@@ -14,15 +15,22 @@ from app.api.v1.schemas.scan import ScanListResponse, ScanReportResponse, ScanRe
 from app.application.dto.scan import CreateScanInput
 from app.application.use_cases.create_scan import CreateScanUseCase
 from app.application.use_cases.delete_scan import DeleteScanUseCase
+from app.application.use_cases.export_scan_report import ExportScanReportUseCase
 from app.application.use_cases.get_scan import GetScanUseCase
 from app.application.use_cases.get_scan_report import GetScanReportUseCase
 from app.application.use_cases.list_scans import ListScansUseCase
 from app.core.config import Settings, get_settings
 from app.core.exceptions import ValidationAppError
+from app.core.rate_limit import limiter
 from app.domain.entities.user import User
 from app.domain.exceptions import SourceTooLargeError
+from app.domain.value_objects.report_format import ReportFormat
 
 router = APIRouter(prefix="/scans", tags=["scans"])
+
+# Each accepted scan costs minutes of model time; see also the per-user cap
+# on unfinished scans (`MAX_ACTIVE_SCANS_PER_USER`).
+_scan_rate_limit = get_settings().scan_rate_limit
 
 
 @router.post(
@@ -36,7 +44,9 @@ router = APIRouter(prefix="/scans", tags=["scans"])
         "background: poll `GET /scans/{scan_id}` until its status is `COMPLETED` or `FAILED`."
     ),
 )
+@limiter.limit(_scan_rate_limit)
 async def create_scan(
+    request: Request,
     file: UploadFile | None = File(default=None),
     code: str | None = Form(default=None),
     language: str | None = Form(default=None),
@@ -101,6 +111,32 @@ async def get_scan_report(
 ) -> ScanReportResponse:
     result = await use_case.execute(current_user.id, scan_id)
     return ScanReportResponse.from_dto(result)
+
+
+@router.get(
+    "/{scan_id}/export",
+    summary="Download a finished scan's report as a JSON or PDF file",
+    response_class=Response,
+    responses={
+        200: {
+            "content": {"application/json": {}, "application/pdf": {}},
+            "description": "The report, as a file download.",
+        }
+    },
+)
+async def export_scan_report(
+    scan_id: UUID,
+    report_format: ReportFormat = Query(default=ReportFormat.JSON, alias="format"),
+    current_user: User = Depends(get_current_user),
+    use_case: ExportScanReportUseCase = Depends(get_export_scan_report_use_case),
+) -> Response:
+    exported = await use_case.execute(current_user.id, scan_id, report_format)
+    return Response(
+        content=exported.content,
+        media_type=exported.media_type,
+        # The filename is built from the scan id only - nothing user-supplied.
+        headers={"Content-Disposition": f'attachment; filename="{exported.filename}"'},
+    )
 
 
 @router.delete(

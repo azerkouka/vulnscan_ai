@@ -11,17 +11,17 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from slowapi import _rate_limit_exceeded_handler
-from slowapi.errors import RateLimitExceeded
 
 from app.api.v1.dependencies import build_scan_job
 from app.api.v1.routers import auth, dashboard, health, knowledge, scans
 from app.application.use_cases.fail_scans import FailInterruptedScansUseCase
+from app.core.body_limit import MaxBodySizeMiddleware
 from app.core.config import get_settings
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import configure_logging, get_logger
 from app.core.middleware import RequestContextMiddleware
 from app.core.rate_limit import limiter
+from app.core.security_headers import SecurityHeadersMiddleware
 from app.infrastructure.jobs.asyncio_job_runner import AsyncioJobRunner
 from app.infrastructure.persistence.database import create_engine, create_session_factory
 from app.infrastructure.persistence.unit_of_work import SqlAlchemyUnitOfWork
@@ -66,28 +66,42 @@ async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
 def create_app() -> FastAPI:
     settings = get_settings()
 
+    # The interactive docs describe every endpoint and load scripts from a
+    # CDN: useful in development, needless exposure in production.
+    in_production = settings.environment == "production"
     app = FastAPI(
         title=settings.app_name,
         description="RAG-grounded LLM source code vulnerability scanner.",
         version="0.1.0",
         lifespan=lifespan,
+        docs_url=None if in_production else "/docs",
+        redoc_url=None if in_production else "/redoc",
+        openapi_url=None if in_production else "/openapi.json",
     )
 
     app.state.limiter = limiter
-    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
 
     # Pure-ASGI middleware only (see app.core.middleware docstring): mixing in
     # a `BaseHTTPMiddleware`-based one (slowapi's `SlowAPIMiddleware`, or the
     # `@app.middleware("http")` decorator) breaks async SQLAlchemy sessions
     # shared across a request boundary via dependency overrides in tests.
+    # Added innermost first; the last one added is the first to see a request.
+    app.add_middleware(MaxBodySizeMiddleware, max_bytes=settings.max_request_body_bytes)
     app.add_middleware(RequestContextMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        # No cookies are used (tokens travel in the Authorization header), so
+        # browsers never need to attach credentials to cross-origin calls.
+        allow_credentials=False,
+        # Exactly what the API uses - not "*".
+        allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type"],
+        max_age=600,
     )
+    # Outermost, so its headers are also on CORS preflights and on errors
+    # produced by the middlewares above.
+    app.add_middleware(SecurityHeadersMiddleware, hsts=in_production)
 
     register_exception_handlers(app)
 
@@ -96,7 +110,6 @@ def create_app() -> FastAPI:
     app.include_router(knowledge.router, prefix=settings.api_v1_prefix)
     app.include_router(scans.router, prefix=settings.api_v1_prefix)
     app.include_router(dashboard.router, prefix=settings.api_v1_prefix)
-    # Report export is registered here when it lands, in Phase 7.
 
     return app
 
